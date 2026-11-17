@@ -77,7 +77,7 @@ dotnet test  tests/PerfTuner.Core.Tests          # runs on any OS
 
 ### A. Standalone (default: nothing installed)
 
-Run `artifacts\PerfTuner\PerfTuner.exe`. It starts `Service\PerfTuner.Service.exe --console` hidden, with the app's own rights, on a per-user pipe (`PerfTuner.standalone.v1.<your SID>`), and keeps its data in `%LOCALAPPDATA%\PerfTuner\Engine`. Closing the window keeps PerfTuner in the tray; **Exit** in the tray menu shuts everything down and undoes live tuning. `PerfTuner.exe --tray` starts minimized to the tray, and `--page N` opens a page directly.
+Run `PerfTuner\PerfTuner.exe`. It starts `Service\PerfTuner.Service.exe --console` hidden, with the app's own rights, on a per-user pipe (`PerfTuner.standalone.v1.<your SID>`), and keeps its data in `%LOCALAPPDATA%\PerfTuner\Engine`. Closing the window keeps PerfTuner in the tray; **Exit** in the tray menu shuts everything down and undoes live tuning. `PerfTuner.exe --tray` starts minimized to the tray, and `--page N` opens a page directly.
 
 ### A2. Developer mode (engine started by hand)
 
@@ -85,15 +85,15 @@ Two terminals:
 
 ```powershell
 # 1) backend in the console, as you, on your per-user standalone pipe
-artifacts\PerfTuner\Service\PerfTuner.Service.exe --console
+PerfTuner\Service\PerfTuner.Service.exe --console
 
 # 2) GUI (or the CLI) against the dev instance
-artifacts\PerfTuner\PerfTuner.exe --dev
-artifacts\cli\perftuner-cli.exe --dev --samples 10
-artifacts\cli\perftuner-cli.exe --dev --selftest
-artifacts\cli\perftuner-cli.exe --dev --tuning-selftest   # applies + verifies + reverts every action on a throw-away ping.exe
-artifacts\cli\perftuner-cli.exe --dev --experiment-selftest  # a real A/B experiment end to end (~90 s)
-artifacts\cli\perftuner-cli.exe --dev --forensics        # timeline, explain, IO / network / memory / regressions / contracts
+PerfTuner\PerfTuner.exe --dev
+perftuner-cli.exe --dev --samples 10
+perftuner-cli.exe --dev --selftest
+perftuner-cli.exe --dev --tuning-selftest   # applies + verifies + reverts every action on a throw-away ping.exe
+perftuner-cli.exe --dev --experiment-selftest  # a real A/B experiment end to end (~90 s)
+perftuner-cli.exe --dev --forensics        # timeline, explain, IO / network / memory / regressions / contracts
 ```
 
 In developer mode the GUI gets full tuning rights without UAC: the console service runs as you, so no privilege boundary is crossed.
@@ -102,7 +102,7 @@ Without elevation, kernel ETW is unavailable, so disk and network come from the 
 
 ### B. Installed service (production path)
 
-1. Run `artifacts\PerfTuner\PerfTuner.exe`. The GUI runs as your normal user.
+1. Run `PerfTuner\PerfTuner.exe`. The GUI runs as your normal user.
 2. **Service → Install / Update** and approve the Windows permission prompt. This:
    - copies the service to `%ProgramFiles%\PerfTuner\Service` (admin-only)
    - creates `%ProgramData%\PerfTuner` with a hardened ACL and a default `config.json`
