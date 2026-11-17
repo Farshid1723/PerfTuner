@@ -1,0 +1,36 @@
+name: release
+
+# Pushing a version tag (v1.2.3) builds, tests and packages PerfTuner on Windows and publishes a GitHub release with
+# PerfTuner-Setup.exe, PerfTuner-Portable.exe and SHA256SUMS.txt.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build PerfTuner.sln -c Release
+      - run: dotnet test tests/PerfTuner.Core.Tests -c Release --no-build
+      - name: Package
+        shell: bash
+        run: build/release/release.sh "$GITHUB_WORKSPACE/release"
+      - name: Check the version matches the tag
+        shell: pwsh
+        run: |
+          $v = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "Tag ${{ github.ref_name }} doesn't match Version $v in Directory.Build.props" }
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" release/PerfTuner-Setup.exe release/PerfTuner-Portable.exe release/SHA256SUMS.txt \
+            --title "PerfTuner ${{ github.ref_name }}" --notes-file build/release/NOTES.md

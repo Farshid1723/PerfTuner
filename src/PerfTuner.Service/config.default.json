@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "aggregationIntervalMs": 1000,
+  "historyCapacity": 3600,
+  "enableEtw": true,
+  "enablePerProcessIo": true,
+  "topProcessCount": 5,
+  "safeMode": true,
+  "maxClients": 4,
+  "maxRequestsPerSecond": 20,
+  "logging": {
+    "minimumLevel": "Information",
+    "retainedFileCount": 7,
+    "fileSizeLimitMb": 10
+  },
+  "circuitBreaker": {
+    "cpuSaturationPercent": 97,
+    "memoryLoadPercent": 95,
+    "commitPercent": 95,
+    "sustainSeconds": 30,
+    "maxCollectorFaultsPerMinute": 5,
+    "cooldownSeconds": 300,
+    "maxTripsPerHour": 3
+  },
+  "budgets": {
+    "serviceCpuPercent": 0.5,
+    "servicePrivateMb": 100
+  }
+}

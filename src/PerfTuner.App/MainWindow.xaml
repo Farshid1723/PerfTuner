@@ -1,0 +1,2512 @@
+<Window x:Class="PerfTuner.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:PerfTuner.App.Controls"
+        xmlns:vm="clr-namespace:PerfTuner.App.ViewModels"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        Title="{Binding Title}" Width="1260" Height="840" MinWidth="980" MinHeight="660"
+        WindowStartupLocation="CenterScreen" Icon="pack://application:,,,/Assets/app.ico"
+        Background="{DynamicResource BgBrush}" FontFamily="{StaticResource UiFont}" Foreground="{DynamicResource TextBrush}">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+  </WindowChrome.WindowChrome>
+  <Window.Resources>
+    <!-- Caption buttons (minimize / maximize / close) drawn in theme colours -->
+    <Style x:Key="CaptionButton" TargetType="Button">
+      <Setter Property="Width" Value="46" />
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+      <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="Transparent">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" /></Trigger>
+              <Trigger Property="Tag" Value="hover"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoftBrush}" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+  <Border x:Name="FrameRoot" BorderBrush="{DynamicResource PlateEdgeBrush}" BorderThickness="1">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="40" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <!-- ============================== title bar ============================== -->
+    <Border Background="{DynamicResource TitleBarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="OnMinimize" ToolTip="Minimize" />
+          <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="OnMaximize" ToolTip="Maximize" />
+          <Button x:Name="CloseButton" Content="&#xE8BB;" Click="OnClose" ToolTip="Close">
+            <Button.Style>
+              <Style TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="Bd" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BadBrush}" />
+                          <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </Button.Style>
+          </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+          <Image Source="pack://application:,,,/Assets/icon256.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
+          <TextBlock Text="PerfTuner" FontFamily="{StaticResource DisplayFont}" FontSize="14" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding VersionText}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="8,1,0,0" VerticalAlignment="Center" />
+          <Border Style="{StaticResource Chip}" Margin="14,0,0,0" VerticalAlignment="Center" Background="{DynamicResource AccentSoftBrush}">
+            <TextBlock Text="{Binding ModeTitle}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+          </Border>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+  <Grid Grid.Row="1">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="250" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- ============================== sidebar ============================== -->
+    <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Height="14" />
+
+        <!-- bottom: current mode + engine state -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="16,8,16,20">
+          <Border Style="{StaticResource Panel}" Margin="0,0,0,10" Cursor="Hand" ToolTip="Change the mode on the Speed page">
+            <Border.InputBindings>
+              <MouseBinding MouseAction="LeftClick" Command="{Binding NavigateCommand}" CommandParameter="1" />
+            </Border.InputBindings>
+            <StackPanel>
+              <TextBlock Text="MODE" Style="{StaticResource Subtle}" FontSize="10.5" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding ModeTitle}" Style="{StaticResource H3}" Margin="0,2,0,0" />
+            </StackPanel>
+          </Border>
+          <StackPanel Orientation="Horizontal" ToolTip="{Binding TelemetryHealthTip}">
+            <Ellipse Width="8" Height="8" Margin="2,0,8,0" VerticalAlignment="Center">
+              <Ellipse.Style>
+                <Style TargetType="Ellipse">
+                  <Setter Property="Fill" Value="{DynamicResource BadBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding TelemetryLevel}" Value="0"><Setter Property="Fill" Value="{DynamicResource GoodBrush}" /></DataTrigger>
+                    <DataTrigger Binding="{Binding TelemetryLevel}" Value="1"><Setter Property="Fill" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Ellipse.Style>
+            </Ellipse>
+            <TextBlock Text="{Binding EngineText}" Style="{StaticResource Subtle}" FontSize="11.5" TextTrimming="CharacterEllipsis" MaxWidth="190" />
+          </StackPanel>
+          <Button Style="{StaticResource SecondaryButton}" Margin="0,10,0,0" Command="{Binding RestartAsAdministratorCommand}"
+                  Visibility="{Binding ShowUnlock, Converter={StaticResource BoolToVis}}"
+                  ToolTip="Restart with administrator rights: unlocks boot timing, driver and disk checks and power settings.">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="&#xE785;" Style="{StaticResource Icon}" Foreground="{DynamicResource WarnBrush}" Margin="0,0,8,0" />
+              <TextBlock Text="Unlock full power" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <ListBox ItemsSource="{Binding Source={x:Static vm:MainViewModel.NavItems}}" SelectedIndex="{Binding SidebarIndex}"
+                 ItemContainerStyle="{StaticResource NavItem}" Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="18" Width="26" VerticalAlignment="Center"
+                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                <StackPanel Margin="10,0,0,0">
+                  <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold"
+                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                  <TextBlock Text="{Binding Subtitle}" FontSize="11.5" Foreground="{DynamicResource SubtleBrush}" />
+                </StackPanel>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- ============================== pages ============================== -->
+    <TabControl Grid.Column="1" Style="{StaticResource PageHost}" SelectedIndex="{Binding SelectedTab}">
+
+      <!-- ============================== 0 Home ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Home" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="vitals" />
+            </StackPanel>
+            <TextBlock Text="How your PC is doing right now, and the things you'll use most." Style="{StaticResource PageSubtitle}" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <!-- health -->
+              <Border Style="{StaticResource Card}" Background="{DynamicResource HeroGradient}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <c:RingGauge Width="112" Height="112" Value="{Binding PulseScore}" Invert="True" Thickness="9"
+                               Text="{Binding PulseScore, StringFormat={}{0:F0}}" Caption="health" />
+                  <StackPanel Grid.Column="1" Margin="18,0,0,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding PulseVerdict}" Style="{StaticResource H2}" FontSize="21" />
+                      <c:HelpButton Topic="health" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding PulseReason}" Style="{StaticResource Subtle}" Margin="0,4,0,12" />
+                    <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Command="{Binding ScanAndFixCommand}">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE9F5;" FontFamily="{StaticResource IconFont}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Scan &amp; Fix" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <!-- mode -->
+              <Border Grid.Column="2" Style="{StaticResource Card}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Mode" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="mode" />
+                  </StackPanel>
+                  <TextBlock Text="Pick one — only one can be on." Style="{StaticResource Subtle}" Margin="0,2,0,10" />
+                  <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="{DynamicResource ControlRadius}" Padding="2">
+                    <UniformGrid Columns="4">
+                      <RadioButton Style="{StaticResource Segment}" GroupName="homeMode" Content="Off" IsChecked="{Binding IsOff}" />
+                      <RadioButton Style="{StaticResource Segment}" GroupName="homeMode" Content="Turbo" IsChecked="{Binding IsTurbo}" ToolTip="Maximum speed for the app you're using" />
+                      <RadioButton Style="{StaticResource Segment}" GroupName="homeMode" Content="Smart" IsChecked="{Binding IsSmart}" ToolTip="Hands-off everyday care" />
+                      <RadioButton Style="{StaticResource Segment}" GroupName="homeMode" Content="Silent" IsChecked="{Binding IsSilent}" ToolTip="Cooler, quieter, longer battery" />
+                    </UniformGrid>
+                  </Border>
+                  <TextBlock Text="{Binding ModeDescription}" Style="{StaticResource Subtle}" Margin="2,10,0,0" />
+                  <TextBlock Text="{Binding ModeMessage}" Style="{StaticResource Message}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <!-- live vitals -->
+            <UniformGrid Columns="4" Margin="0,0,-16,0">
+              <Border Style="{StaticResource Card}" Margin="0,0,16,16" Padding="14,12" Cursor="Hand" ToolTip="Open Processor in the Cockpit">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftClick" Command="{Binding OpenCockpitCommand}" CommandParameter="cpu" />
+                </Border.InputBindings>
+                <StackPanel>
+                  <DockPanel>
+                    <c:HardwareIcon DockPanel.Dock="Left" Width="40" Height="40" Kind="{Binding Cockpit.Cpu.Kind}" Load="{Binding Cockpit.Cpu.Load}"
+                                    State="{Binding Cockpit.Cpu.State}" CoolDownToken="{Binding Cockpit.Cpu.CoolDownToken}" Margin="0,0,10,0" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding CpuValue}" Style="{StaticResource BigNumber}" FontSize="20" VerticalAlignment="Center" />
+                    <TextBlock Text="Processor" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <c:Sparkline Height="34" Margin="0,8,0,4" Values="{Binding CpuHistory}" Max="100" Stroke="{DynamicResource AccentBrush}" />
+                  <TextBlock Text="{Binding CpuDetail}" Style="{StaticResource Subtle}" FontSize="11.5" />
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}" Margin="0,0,16,16" Padding="14,12" Cursor="Hand" ToolTip="Open Memory in the Cockpit">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftClick" Command="{Binding OpenCockpitCommand}" CommandParameter="memory" />
+                </Border.InputBindings>
+                <StackPanel>
+                  <DockPanel>
+                    <c:HardwareIcon DockPanel.Dock="Left" Width="40" Height="40" Kind="{Binding Cockpit.Memory.Kind}" Load="{Binding Cockpit.Memory.Load}"
+                                    State="{Binding Cockpit.Memory.State}" CoolDownToken="{Binding Cockpit.Memory.CoolDownToken}" Margin="0,0,10,0" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding MemoryValue}" Style="{StaticResource BigNumber}" FontSize="20" VerticalAlignment="Center" />
+                    <TextBlock Text="Memory" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <c:Sparkline Height="34" Margin="0,8,0,4" Values="{Binding MemoryHistory}" Max="100" Stroke="{DynamicResource AccentAltBrush}" />
+                  <TextBlock Text="{Binding MemoryDetail}" Style="{StaticResource Subtle}" FontSize="11.5" />
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}" Margin="0,0,16,16" Padding="14,12" Cursor="Hand" ToolTip="Open Disk in the Cockpit">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftClick" Command="{Binding OpenCockpitCommand}" CommandParameter="disk" />
+                </Border.InputBindings>
+                <StackPanel>
+                  <DockPanel>
+                    <c:HardwareIcon DockPanel.Dock="Left" Width="40" Height="40" Kind="{Binding Cockpit.Disk.Kind}" Load="{Binding Cockpit.Disk.Load}"
+                                    State="{Binding Cockpit.Disk.State}" CoolDownToken="{Binding Cockpit.Disk.CoolDownToken}" Margin="0,0,10,0" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding DiskValue}" Style="{StaticResource BigNumber}" FontSize="20" VerticalAlignment="Center" />
+                    <TextBlock Text="Disk" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <c:Sparkline Height="34" Margin="0,8,0,4" Values="{Binding DiskHistory}" Stroke="{DynamicResource WarnBrush}" />
+                  <TextBlock Text="{Binding DiskDetail}" Style="{StaticResource Subtle}" FontSize="11.5" />
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}" Margin="0,0,16,16" Padding="14,12" Cursor="Hand" ToolTip="Open Network in the Cockpit">
+                <Border.InputBindings>
+                  <MouseBinding MouseAction="LeftClick" Command="{Binding OpenCockpitCommand}" CommandParameter="network" />
+                </Border.InputBindings>
+                <StackPanel>
+                  <DockPanel>
+                    <c:HardwareIcon DockPanel.Dock="Left" Width="40" Height="40" Kind="{Binding Cockpit.Network.Kind}" Load="{Binding Cockpit.Network.Load}"
+                                    State="{Binding Cockpit.Network.State}" CoolDownToken="{Binding Cockpit.Network.CoolDownToken}" Margin="0,0,10,0" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding NetworkValue}" Style="{StaticResource BigNumber}" FontSize="20" VerticalAlignment="Center" />
+                    <TextBlock Text="Network" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <c:Sparkline Height="34" Margin="0,8,0,4" Values="{Binding NetworkHistory}" Stroke="{DynamicResource GoodBrush}" />
+                  <TextBlock Text="{Binding NetworkDetail}" Style="{StaticResource Subtle}" FontSize="11.5" />
+                </StackPanel>
+              </Border>
+            </UniformGrid>
+
+            <!-- quick actions -->
+            <StackPanel Orientation="Horizontal" Margin="0,4,0,12">
+              <TextBlock Text="Quick actions" Style="{StaticResource H2}" />
+              <c:HelpButton Topic="quick" />
+            </StackPanel>
+            <UniformGrid Columns="3" Margin="0,0,-12,0">
+              <Button Style="{StaticResource ActionTile}" Command="{Binding RamRefreshCommand}">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE964;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Free up RAM" Style="{StaticResource H3}" />
+                    <TextBlock Text="Background apps hand back unused memory" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource ActionTile}" Command="{Binding CleanJunkCommand}">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE74D;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Clean junk files" Style="{StaticResource H3}" />
+                    <TextBlock Text="See how much space you can get back" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource ActionTile}" Command="{Binding NavigateCommand}" CommandParameter="3">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE7E8;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Faster startup" Style="{StaticResource H3}" />
+                    <TextBlock Text="Boot time and apps that start with Windows" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource ActionTile}" Command="{Binding NavigateCommand}" CommandParameter="5">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE9D9;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Why is my PC slow?" Style="{StaticResource H3}" />
+                    <TextBlock Text="Plain answers, with a fix" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource ActionTile}" Command="{Binding NavigateCommand}" CommandParameter="4">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE71D;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Control an app" Style="{StaticResource H3}" />
+                    <TextBlock Text="Priority, efficiency, memory" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+              <Button Style="{StaticResource ActionTile}" Command="{Binding UndoEverythingCommand}">
+                <StackPanel Orientation="Horizontal">
+                  <Border Style="{StaticResource IconCircle}"><TextBlock Text="&#xE7A7;" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" /></Border>
+                  <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Undo everything" Style="{StaticResource H3}" />
+                    <TextBlock Text="Put every change back the way it was" Style="{StaticResource Subtle}" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+            </UniformGrid>
+            <TextBlock Text="{Binding QuickMessage}" Style="{StaticResource Message}" Margin="0,0,0,14" />
+
+            <!-- recent automatic actions -->
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="See all" Command="{Binding NavigateCommand}" CommandParameter="6" />
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="What PerfTuner did" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="activity" />
+                  </StackPanel>
+                </DockPanel>
+                <TextBlock Text="Nothing yet. When a mode or automatic fix changes something, it shows up here (and as a tray notification)."
+                           Style="{StaticResource Subtle}" Margin="0,8,0,0">
+                  <TextBlock.Visibility>
+                    <Binding Path="Activity.Count">
+                      <Binding.Converter><vm:ZeroToVisibleConverter /></Binding.Converter>
+                    </Binding>
+                  </TextBlock.Visibility>
+                </TextBlock>
+                <ItemsControl ItemsSource="{Binding Activity}" Margin="0,8,0,0" MaxHeight="190">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,4">
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Style="{StaticResource Subtle}" Width="48" />
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding Who}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Width="130" FontSize="13" />
+                        <TextBlock Text="{Binding Text}" Style="{StaticResource Body}" FontSize="13" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 1 Speed ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Speed" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="mode" />
+            </StackPanel>
+            <TextBlock Text="Choose one mode. Only one can be on at a time — switching or turning it off undoes everything the previous mode changed." Style="{StaticResource PageSubtitle}" />
+
+            <UniformGrid Columns="2" Margin="0,0,-12,0">
+              <RadioButton Style="{StaticResource ModeCard}" GroupName="mode" IsChecked="{Binding IsTurbo}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource IconCircle}" Width="46" Height="46"><TextBlock Text="&#xE945;" Style="{StaticResource Icon}" FontSize="22" HorizontalAlignment="Center" /></Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="Turbo" Style="{StaticResource H2}" FontSize="20" />
+                      <TextBlock Text="Maximum speed for the app you're using" Style="{StaticResource Subtle}" FontSize="13" />
+                    </StackPanel>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Body}" Margin="0,14,0,0" LineHeight="21"
+                             Text="• The app in front gets top priority (follows you as you switch)&#x0a;• Busy background apps are held back in efficiency mode&#x0a;• Power plan switches to full performance" />
+                  <TextBlock Text="Best for: games, video editing, big compiles" Style="{StaticResource Subtle}" Margin="0,10,0,0" FontStyle="Italic" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Style="{StaticResource ModeCard}" GroupName="mode" IsChecked="{Binding IsSmart}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource IconCircle}" Width="46" Height="46"><TextBlock Text="&#xE9E9;" Style="{StaticResource Icon}" FontSize="22" HorizontalAlignment="Center" /></Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="Smart" Style="{StaticResource H2}" FontSize="20" />
+                      <TextBlock Text="Hands-off care, all day" Style="{StaticResource Subtle}" FontSize="13" />
+                    </StackPanel>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Body}" Margin="0,14,0,0" LineHeight="21"
+                             Text="• Background apps that hog the CPU for 30 s are calmed down&#x0a;• When free RAM runs low, memory is freed automatically&#x0a;• Power plan unchanged — no effect on battery" />
+                  <TextBlock Text="Best for: everyday use — recommended" Style="{StaticResource Subtle}" Margin="0,10,0,0" FontStyle="Italic" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Style="{StaticResource ModeCard}" GroupName="mode" IsChecked="{Binding IsSilent}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource IconCircle}" Width="46" Height="46"><TextBlock Text="&#xE708;" Style="{StaticResource Icon}" FontSize="22" HorizontalAlignment="Center" /></Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="Silent" Style="{StaticResource H2}" FontSize="20" />
+                      <TextBlock Text="Cooler, quieter, longer battery" Style="{StaticResource Subtle}" FontSize="13" />
+                    </StackPanel>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Body}" Margin="0,14,0,0" LineHeight="21"
+                             Text="• CPU turbo boost off and speed capped at 80 % — far less heat&#x0a;• Fans spin down, laptop battery lasts longer&#x0a;• Every busy background app runs in efficiency mode" />
+                  <TextBlock Text="Best for: meetings, reading, laptops on battery, hot rooms" Style="{StaticResource Subtle}" Margin="0,10,0,0" FontStyle="Italic" />
+                </StackPanel>
+              </RadioButton>
+              <RadioButton Style="{StaticResource ModeCard}" GroupName="mode" IsChecked="{Binding IsOff}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource IconCircle}" Width="46" Height="46"><TextBlock Text="&#xE7E8;" Style="{StaticResource Icon}" FontSize="22" HorizontalAlignment="Center" /></Border>
+                    <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="Off" Style="{StaticResource H2}" FontSize="20" />
+                      <TextBlock Text="Windows as usual" Style="{StaticResource Subtle}" FontSize="13" />
+                    </StackPanel>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Body}" Margin="0,14,0,0" LineHeight="21"
+                             Text="• Nothing happens automatically&#x0a;• Everything a mode changed is put back&#x0a;• Buttons you click still work" />
+                  <TextBlock Text="Best for: when you want full manual control" Style="{StaticResource Subtle}" Margin="0,10,0,0" FontStyle="Italic" />
+                </StackPanel>
+              </RadioButton>
+            </UniformGrid>
+            <TextBlock Text="{Binding ModeMessage}" Style="{StaticResource Message}" Margin="0,0,0,16" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Free up RAM now" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="ram" />
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Subtle}" Margin="0,4,0,12"
+                             Text="Asks every background app to hand back memory it isn't using. Harmless — anything still needed comes back on demand. The app you're using is skipped." />
+                  <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Content="Free up RAM" Command="{Binding RamRefreshCommand}" />
+                  <TextBlock Text="{Binding QuickMessage}" Style="{StaticResource Message}" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Style="{StaticResource Card}">
+                <StackPanel>
+                  <DockPanel>
+                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding AutoFixOn}" />
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Automatic fixes" Style="{StaticResource H2}" />
+                      <c:HelpButton Topic="autofix" />
+                    </StackPanel>
+                  </DockPanel>
+                  <TextBlock Style="{StaticResource Subtle}" Margin="0,4,0,0"
+                             Text="PerfTuner learns how this PC normally behaves. When something gets slower, it tests a fix for 60 seconds and keeps it only if it measurably helps. You get a notification every time." />
+                  <TextBlock Text="{Binding OperationMessage}" Style="{StaticResource Message}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Expander Margin="0,0,0,16" DataContext="{Binding SystemSettings}" Foreground="{DynamicResource TextBrush}">
+              <Expander.Header>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Power settings (advanced)" VerticalAlignment="Center" />
+                  <c:HelpButton Topic="power" />
+                </StackPanel>
+              </Expander.Header>
+              <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                <StackPanel>
+                  <TextBlock Text="Turbo and Silent change these for you. Set them here only if you want to fine-tune." Style="{StaticResource Subtle}" Margin="0,0,0,12" />
+                  <WrapPanel>
+                    <StackPanel Margin="0,0,24,12">
+                      <TextBlock Text="Power plan" Style="{StaticResource Subtle}" />
+                      <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <ComboBox ItemsSource="{Binding PowerPlans}" SelectedItem="{Binding SelectedPlan}" DisplayMemberPath="Name" Width="220" />
+                        <Button Style="{StaticResource SecondaryButton}" Content="Use" Margin="8,0,0,0" Command="{Binding ApplyPowerPlanCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,24,12">
+                      <TextBlock Text="CPU turbo boost" Style="{StaticResource Subtle}" />
+                      <ComboBox ItemsSource="{Binding BoostOptions}" SelectedItem="{Binding SelectedBoost}" DisplayMemberPath="Name" Width="200" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,24,12" Width="220">
+                      <TextBlock Text="{Binding MaxProcessorState, StringFormat='Maximum CPU speed: {0:F0} %'}" Style="{StaticResource Subtle}" />
+                      <Slider Minimum="5" Maximum="100" Value="{Binding MaxProcessorState}" TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,24,12" Width="220">
+                      <TextBlock Text="{Binding MinProcessorState, StringFormat='Minimum CPU speed: {0:F0} %'}" Style="{StaticResource Subtle}" />
+                      <Slider Minimum="0" Maximum="100" Value="{Binding MinProcessorState}" TickFrequency="5" IsSnapToTickEnabled="True" Margin="0,6,0,0" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <Button Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Content="Apply CPU settings" Command="{Binding ApplyProcessorPowerCommand}" />
+                  <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" />
+                </StackPanel>
+              </Border>
+            </Expander>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 2 Clean ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding SystemSettings}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Clean" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="junk" />
+            </StackPanel>
+            <TextBlock Text="Get disk space back and switch on Windows settings that make your PC feel faster. Every setting can be switched back." Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Style="{StaticResource SecondaryButton}" Content="Scan" Command="{Binding ScanJunkCommand}" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="Clean selected" Command="{Binding CleanJunkCommand}" />
+                  </StackPanel>
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Junk files" Style="{StaticResource H2}" />
+                      <c:HelpButton Topic="junk" />
+                      <Button Style="{StaticResource LinkButton}" Content="Find big files and folders →" Margin="16,0,0,0" VerticalAlignment="Center"
+                              Command="{Binding DataContext.OpenSpaceExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding JunkSummary}" Style="{StaticResource Subtle}" Margin="0,4,0,0" />
+                  </StackPanel>
+                </DockPanel>
+                <TextBlock Text="{Binding JunkTotal}" FontFamily="{StaticResource DisplayFont}" FontSize="34" FontWeight="SemiBold"
+                           Foreground="{DynamicResource AccentBrush}" Margin="0,10,0,6" />
+                <ItemsControl ItemsSource="{Binding Junk}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" Style="{StaticResource H3}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                          <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Selected}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                          <StackPanel>
+                            <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" />
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding DataContext.Maintenance, RelativeSource={RelativeSource AncestorType=Window}}">
+              <StackPanel>
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Measure again" Command="{Binding MeasureCommand}" VerticalAlignment="Center" />
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Windows Update leftovers" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="update-leftovers" />
+                  </StackPanel>
+                </DockPanel>
+                <TextBlock Text="Space Windows Update keeps after updates are installed. Each action explains what it does before it runs." Style="{StaticResource Subtle}" Margin="0,2,0,10" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Caches}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,8" Padding="14,10">
+                        <DockPanel>
+                          <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Empty" Padding="14,5" VerticalAlignment="Center"
+                                  Command="{Binding DataContext.CleanCacheCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" Style="{StaticResource H3}" VerticalAlignment="Center" Margin="12,0,16,0" />
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Style="{StaticResource Panel}" Margin="0,0,0,8" Padding="14,10">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Clean up" Padding="14,5" VerticalAlignment="Center" Command="{Binding ComponentCleanupCommand}" />
+                    <StackPanel>
+                      <TextBlock Text="Old Windows components (WinSxS)" Style="{StaticResource H3}" />
+                      <TextBlock Text="Runs Windows' own component cleanup: removes versions replaced by updates more than 30 days ago. Can't be undone; takes up to an hour in the background." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+                <Border Style="{StaticResource Panel}" Padding="14,10">
+                  <StackPanel>
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource SecondaryButton}" Content="Find" Padding="14,5" Command="{Binding FindOrphansCommand}" Margin="0,0,8,0" />
+                        <Button Style="{StaticResource PrimaryButton}" Content="Move to…" Padding="14,5" Command="{Binding MoveOrphansCommand}"
+                                Visibility="{Binding HasOrphans, Converter={StaticResource BoolToVis}}" />
+                      </StackPanel>
+                      <StackPanel>
+                        <TextBlock Text="Orphaned installer packages" Style="{StaticResource H3}" />
+                        <TextBlock Text="Old .msi/.msp files in Windows' installer cache that no installed program or update needs any more. Moved to a folder you choose, never deleted." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding OrphanText}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                  </StackPanel>
+                </Border>
+                <ProgressBar IsIndeterminate="True" Height="3" Margin="0,10,0,0" Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding CleanMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Optimize a drive" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="drives" />
+                </StackPanel>
+                <TextBlock Text="Runs Windows' own optimization: TRIM on SSDs (seconds), defragment on hard disks (can take a while)." Style="{StaticResource Subtle}" Margin="0,4,0,12" />
+                <StackPanel Orientation="Horizontal">
+                  <ComboBox ItemsSource="{Binding Volumes}" SelectedItem="{Binding SelectedVolume}" Width="280" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Optimize" Margin="8,0,0,0" Command="{Binding OptimizeDriveCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding DriveStatus}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 3 Startup ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding Startup}">
+          <StackPanel>
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding LoadCommand}" VerticalAlignment="Top" />
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Startup" Style="{StaticResource PageTitle}" />
+                <c:HelpButton Topic="boot" />
+              </StackPanel>
+            </DockPanel>
+            <TextBlock Text="How fast Windows starts, what slows it down, and which apps start with it." Style="{StaticResource PageSubtitle}" />
+
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="5*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="6*" />
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource Card}" Background="{DynamicResource HeroGradient}">
+                <StackPanel>
+                  <TextBlock Text="Last boot took" Style="{StaticResource Subtle}" />
+                  <TextBlock Text="{Binding LastBootValue}" FontFamily="{StaticResource DisplayFont}" FontSize="44" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding BootVerdict}" Style="{StaticResource H3}" />
+                  <TextBlock Text="{Binding BootAverage}" Style="{StaticResource Subtle}" Margin="0,4,0,0" />
+                  <TextBlock Text="{Binding LastBootDetail}" Style="{StaticResource Subtle}" Margin="0,2,0,10" />
+                  <ItemsControl ItemsSource="{Binding Boots}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                          <TextBlock Text="{Binding When}" Style="{StaticResource Subtle}" Width="54" FontSize="11.5" />
+                          <Border Height="10" CornerRadius="5" Width="{Binding BarWidth}" Background="{DynamicResource AccentGradient}" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Text}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="8,0,0,0" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Style="{StaticResource Card}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="Recommendations" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="startup-recs" />
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding Recommendations}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="18" VerticalAlignment="Top" Margin="0,2,12,0" />
+                            <Button DockPanel.Dock="Right" Content="{Binding ActionText}" VerticalAlignment="Center" Margin="12,0,0,0"
+                                    Command="{Binding DataContext.RunRecommendationCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                              <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActionText}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </Button.Style>
+                            </Button>
+                            <StackPanel>
+                              <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                              <TextBlock Text="{Binding Detail}" Style="{StaticResource Subtle}" Margin="0,2,0,0" />
+                            </StackPanel>
+                          </DockPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Apps that start with Windows" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="startup-apps" />
+                </StackPanel>
+                <TextBlock Text="{Binding AppsSummary}" Style="{StaticResource Subtle}" Margin="0,4,0,0" />
+                <TextBlock Style="{StaticResource Subtle}" Margin="0,2,0,10" FontSize="11.5">
+                  <Run Text="Click a column title to sort. " /><Run Text="{Binding MeasureNote}" />
+                </TextBlock>
+                <DataGrid x:Name="StartupGrid" ItemsSource="{Binding Apps}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="None" Background="Transparent" RowBackground="Transparent"
+                          CanUserSortColumns="True" CanUserResizeRows="False" MaxHeight="520" SelectionMode="Single">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="App" Binding="{Binding Name}" Width="2*" />
+                    <DataGridTemplateColumn Header="Impact" SortMemberPath="ImpactRank" Width="110">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                          <Border CornerRadius="{DynamicResource PillRadius}" Padding="10,2" HorizontalAlignment="Left">
+                            <Border.Style>
+                              <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Impact}" Value="High"><Setter Property="Background" Value="{DynamicResource BadSoftBrush}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Impact}" Value="Medium"><Setter Property="Background" Value="{DynamicResource WarnSoftBrush}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding Impact}" Value="Low"><Setter Property="Background" Value="{DynamicResource GoodSoftBrush}" /></DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding Impact}" FontSize="12" FontWeight="SemiBold" />
+                          </Border>
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Starts after boot" Binding="{Binding StartedText}" SortMemberPath="StartedAfter" Width="125" />
+                    <DataGridTextColumn Header="CPU time" Binding="{Binding CpuText}" SortMemberPath="CpuSeconds" Width="90" />
+                    <DataGridTextColumn Header="Disk read" Binding="{Binding DiskText}" SortMemberPath="DiskMb" Width="90" />
+                    <DataGridTextColumn Header="Boot delay" Binding="{Binding BootDelayText}" SortMemberPath="BootDelayMs" Width="95" />
+                    <DataGridTextColumn Header="From" Binding="{Binding Source}" Width="*" />
+                    <DataGridTemplateColumn Header="Starts with Windows" SortMemberPath="Enabled" Width="150">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                          <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding Enabled, Mode=OneWay}" Content="{Binding StateText}"
+                                    Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" />
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                  </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 4 Apps ============================== -->
+      <TabItem>
+        <Grid Margin="32,26,32,20" DataContext="{Binding Processes}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="340" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal" Grid.ColumnSpan="3">
+            <TextBlock Text="Apps" Style="{StaticResource PageTitle}" />
+            <c:HelpButton Topic="apps" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource PageSubtitle}"
+                     Text="Pick a running app to speed it up, slow it down or free its memory. Windows' own processes are protected. Everything can be undone in History." />
+
+          <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0">
+            <DockPanel>
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding RefreshCommand}" Margin="8,0,0,0" />
+                <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search by app name" />
+              </DockPanel>
+              <TextBlock DockPanel.Dock="Bottom" Text="{Binding Summary}" Style="{StaticResource Subtle}" Margin="0,8,0,0" />
+              <ListView ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent" BorderThickness="0">
+                <ListView.View>
+                  <GridView>
+                    <GridViewColumn Header="App" Width="210" DisplayMemberBinding="{Binding Name}" />
+                    <GridViewColumn Header="CPU" Width="70" DisplayMemberBinding="{Binding Cpu}" />
+                    <GridViewColumn Header="Memory" Width="90" DisplayMemberBinding="{Binding Memory}" />
+                    <GridViewColumn Header="Priority" Width="100" DisplayMemberBinding="{Binding Priority}" />
+                    <GridViewColumn Header="Status" Width="220" DisplayMemberBinding="{Binding Status}" />
+                  </GridView>
+                </ListView.View>
+              </ListView>
+            </DockPanel>
+          </Border>
+
+          <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <TextBlock Text="{Binding SelectionTitle}" Style="{StaticResource H3}" Margin="0,0,0,12" />
+                <TextBlock Text="Speed" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                <UniformGrid Columns="3" Margin="0,6,0,14">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Faster" Margin="0,0,6,0" Command="{Binding SetPriorityCommand}" CommandParameter="AboveNormal" ToolTip="Higher priority: this app gets the CPU first" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Normal" Margin="0,0,6,0" Command="{Binding SetPriorityCommand}" CommandParameter="Normal" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Slower" Command="{Binding SetPriorityCommand}" CommandParameter="BelowNormal" ToolTip="Lower priority: gives way to other apps" />
+                </UniformGrid>
+                <TextBlock Text="Save power" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                <UniformGrid Columns="2" Margin="0,6,0,14">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Efficiency mode" Margin="0,0,6,0" Command="{Binding EfficiencyCommand}" CommandParameter="true" ToolTip="Less power and heat, like Task Manager's efficiency mode" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Normal" Command="{Binding EfficiencyCommand}" CommandParameter="false" />
+                </UniformGrid>
+                <TextBlock Text="Memory" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                <UniformGrid Columns="2" Margin="0,6,0,14">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Free its RAM" Margin="0,0,6,0" Command="{Binding TrimCommand}" ToolTip="The app hands back memory it isn't using" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Low priority" Command="{Binding MemoryPriorityCommand}" CommandParameter="Low" ToolTip="Its memory is the first to be reclaimed when RAM is short" />
+                </UniformGrid>
+                <TextBlock Text="Graphics card (next start)" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                <UniformGrid Columns="2" Margin="0,6,0,14">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Powerful GPU" Margin="0,0,6,0" Command="{Binding GpuPreferenceCommand}" CommandParameter="high" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Battery GPU" Command="{Binding GpuPreferenceCommand}" CommandParameter="saving" />
+                </UniformGrid>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Every time this app starts" Style="{StaticResource Subtle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <c:HelpButton Topic="rules" />
+                </StackPanel>
+                <UniformGrid Columns="2" Margin="0,6,0,14">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Always efficient" Margin="0,0,6,6" Command="{Binding SaveRuleCommand}" CommandParameter="efficiency" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Always slower" Margin="0,0,0,6" Command="{Binding SaveRuleCommand}" CommandParameter="below" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Always faster" Margin="0,0,6,0" Command="{Binding SaveRuleCommand}" CommandParameter="above" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Always E-cores" Command="{Binding SaveRuleCommand}" CommandParameter="ecores" ToolTip="Only on hybrid Intel CPUs" />
+                </UniformGrid>
+                <Button Style="{StaticResource SecondaryButton}" Content="End task…" Foreground="{DynamicResource BadBrush}" Command="{Binding EndCommand}" HorizontalAlignment="Left" />
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" />
+
+                <TextBlock Text="Your app rules" Style="{StaticResource H3}" Margin="0,18,0,6" />
+                <ListBox ItemsSource="{Binding DataContext.Tuning.Rules, RelativeSource={RelativeSource AncestorType=Window}}"
+                         SelectedItem="{Binding DataContext.Tuning.SelectedRule, RelativeSource={RelativeSource AncestorType=Window}}"
+                         MaxHeight="160" Background="Transparent" BorderThickness="0">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Actions}" Style="{StaticResource Subtle}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Style="{StaticResource LinkButton}" Content="Remove selected rule" Margin="0,6,0,0" HorizontalAlignment="Left"
+                        Command="{Binding DataContext.Tuning.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <!-- ============================== 5 Troubleshoot ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding Troubleshoot}">
+          <StackPanel>
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Check everything" Command="{Binding CheckAllCommand}" VerticalAlignment="Top" />
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Troubleshoot" Style="{StaticResource PageTitle}" />
+                <c:HelpButton Topic="troubleshoot" />
+              </StackPanel>
+            </DockPanel>
+            <TextBlock Text="Pick what's bothering you. PerfTuner measures it and answers in plain words — with a fix when there is one." Style="{StaticResource PageSubtitle}" />
+            <ItemsControl ItemsSource="{Binding Questions}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid Columns="2" Margin="0,0,-16,0" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource Card}" Margin="0,0,16,16">
+                    <StackPanel>
+                      <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Check" VerticalAlignment="Top"
+                                Command="{Binding DataContext.CheckCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                        <Border Style="{StaticResource IconCircle}" DockPanel.Dock="Left" VerticalAlignment="Top">
+                          <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="18" HorizontalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="12,0,10,0">
+                          <TextBlock Text="{Binding Question}" Style="{StaticResource H3}" FontSize="15.5" />
+                          <TextBlock Text="{Binding Explainer}" Style="{StaticResource Subtle}" Margin="0,2,0,0" />
+                        </StackPanel>
+                      </DockPanel>
+                      <ProgressBar IsIndeterminate="True" Height="3" Margin="0,12,0,0" Visibility="{Binding Running, Converter={StaticResource BoolToVis}}" />
+                      <Border CornerRadius="{DynamicResource ControlRadius}" Padding="14,12" Margin="0,12,0,0" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVis}}">
+                        <Border.Style>
+                          <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding Verdict}" Value="Good"><Setter Property="Background" Value="{DynamicResource GoodSoftBrush}" /></DataTrigger>
+                              <DataTrigger Binding="{Binding Verdict}" Value="Warning"><Setter Property="Background" Value="{DynamicResource WarnSoftBrush}" /></DataTrigger>
+                              <DataTrigger Binding="{Binding Verdict}" Value="Problem"><Setter Property="Background" Value="{DynamicResource BadSoftBrush}" /></DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Border.Style>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Answer}" Style="{StaticResource Body}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Details}" Style="{StaticResource Subtle}" Margin="0,6,0,0" />
+                          <Button Style="{StaticResource PrimaryButton}" Content="{Binding ActionText}" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="16,7"
+                                  Visibility="{Binding HasAction, Converter={StaticResource BoolToVis}}"
+                                  Command="{Binding DataContext.RunActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Style="{StaticResource Card}" DataContext="{Binding DataContext.Maintenance, RelativeSource={RelativeSource AncestorType=Window}}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Repair tools" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="repair-tools" />
+                </StackPanel>
+                <TextBlock Text="For when something is broken. Each tool explains what it does before it runs." Style="{StaticResource Subtle}" Margin="0,2,0,10" />
+                <UniformGrid Columns="3" Margin="0,0,-12,0">
+                  <Button Style="{StaticResource ActionTile}" Command="{Binding RepairWindowsCommand}">
+                    <StackPanel>
+                      <TextBlock Text="Repair Windows" Style="{StaticResource H3}" />
+                      <TextBlock Text="Check Windows' system files and repair damage from Windows Update." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ActionTile}" Command="{Binding ResetWindowsUpdateCommand}">
+                    <StackPanel>
+                      <TextBlock Text="Reset Windows Update" Style="{StaticResource H3}" />
+                      <TextBlock Text="When updates keep failing: rebuild Windows Update's working folders." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource ActionTile}" Command="{Binding CreateRestorePointCommand}">
+                    <StackPanel>
+                      <TextBlock Text="Create a restore point" Style="{StaticResource H3}" />
+                      <TextBlock Text="A snapshot of system settings to go back to if a change goes wrong." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Button>
+                </UniformGrid>
+                <TextBlock Text="{Binding RepairProgress}" Style="{StaticResource Subtle}" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding RepairMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                <TextBlock Text="Classic Windows panels" Style="{StaticResource H3}" Margin="0,16,0,8" />
+                <WrapPanel>
+                  <Button Style="{StaticResource SecondaryButton}" Content="Control Panel" Command="{Binding OpenPanelCommand}" CommandParameter="control" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Network connections" Command="{Binding OpenPanelCommand}" CommandParameter="network" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Power options" Command="{Binding OpenPanelCommand}" CommandParameter="power" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Sound" Command="{Binding OpenPanelCommand}" CommandParameter="sound" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="System" Command="{Binding OpenPanelCommand}" CommandParameter="system" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Devices and printers" Command="{Binding OpenPanelCommand}" CommandParameter="devices" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Programs and features" Command="{Binding OpenPanelCommand}" CommandParameter="programs" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Recovery" Command="{Binding OpenPanelCommand}" CommandParameter="recovery" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Computer Management" Command="{Binding OpenPanelCommand}" CommandParameter="computer" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Mouse" Command="{Binding OpenPanelCommand}" CommandParameter="mouse" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Printers" Command="{Binding OpenPanelCommand}" CommandParameter="printers" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Region" Command="{Binding OpenPanelCommand}" CommandParameter="region" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Date and time" Command="{Binding OpenPanelCommand}" CommandParameter="datetime" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Windows Firewall" Command="{Binding OpenPanelCommand}" CommandParameter="firewall" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Security and Maintenance" Command="{Binding OpenPanelCommand}" CommandParameter="maintenance" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="System Properties" Command="{Binding OpenPanelCommand}" CommandParameter="sysprops" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="System Restore" Command="{Binding OpenPanelCommand}" CommandParameter="restore" Margin="0,0,8,8" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 6 History ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}">
+          <StackPanel>
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Undo everything" Command="{Binding UndoEverythingCommand}" VerticalAlignment="Top" />
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="History" Style="{StaticResource PageTitle}" />
+                <c:HelpButton Topic="history" />
+              </StackPanel>
+            </DockPanel>
+            <TextBlock Text="Everything PerfTuner changed and did. Every change can be undone on its own, or all at once." Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}" Background="{DynamicResource WarnSoftBrush}" DataContext="{Binding Changes}"
+                    Visibility="{Binding BreakerTripped, Converter={StaticResource BoolToVis}}">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Resume" Command="{Binding ResetBreakerCommand}" VerticalAlignment="Center" />
+                <StackPanel>
+                  <TextBlock Text="Automatic tuning is paused for safety" Style="{StaticResource H3}" />
+                  <TextBlock Text="{Binding BreakerText}" Style="{StaticResource Subtle}" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding Changes}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Changes to running apps" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="history" />
+                </StackPanel>
+                <TextBlock Text="Undone automatically when an app closes or PerfTuner exits." Style="{StaticResource Subtle}" Margin="0,2,0,10" />
+                <ItemsControl ItemsSource="{Binding LiveChanges}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,6" Padding="12,8">
+                        <DockPanel>
+                          <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Undo" Padding="12,5"
+                                  Command="{Binding DataContext.RevertLiveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Style="{StaticResource Subtle}" Width="70" VerticalAlignment="Center" />
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Source}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Width="130" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Description}" Style="{StaticResource Body}" VerticalAlignment="Center" />
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding Changes}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Changes to Windows settings" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="history" />
+                </StackPanel>
+                <TextBlock Text="These stay until you undo them (also undone if you uninstall PerfTuner)." Style="{StaticResource Subtle}" Margin="0,2,0,10" />
+                <ItemsControl ItemsSource="{Binding SettingChanges}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,6" Padding="12,8">
+                        <DockPanel>
+                          <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Undo" Padding="12,5"
+                                  Command="{Binding DataContext.RevertSettingCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Style="{StaticResource Subtle}" Width="130" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Description}" Style="{StaticResource Body}" VerticalAlignment="Center" />
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding Changes}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Files you moved or deleted" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="space-actions" />
+                </StackPanel>
+                <TextBlock Text="From the Space explorer. Moves can be undone one at a time; Undo everything and uninstall never move your files." Style="{StaticResource Subtle}" Margin="0,2,0,10" TextWrapping="Wrap" />
+                <TextBlock Text="Nothing yet." Style="{StaticResource Subtle}">
+                  <TextBlock.Visibility>
+                    <Binding Path="FileOps.Count"><Binding.Converter><vm:ZeroToVisibleConverter /></Binding.Converter></Binding>
+                  </TextBlock.Visibility>
+                </TextBlock>
+                <ItemsControl ItemsSource="{Binding FileOps}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,6" Padding="12,8">
+                        <DockPanel>
+                          <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Move back" Padding="12,5"
+                                  Visibility="{Binding CanUndo, Converter={StaticResource BoolToVis}}"
+                                  Command="{Binding DataContext.UndoFileMoveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding Note}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Style="{StaticResource Subtle}" Width="130" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Description}" Style="{StaticResource Body}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                  <TextBlock Text="What PerfTuner did on its own" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="activity" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Activity}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,4">
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Style="{StaticResource Subtle}" Width="54" />
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding Who}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Width="150" />
+                        <TextBlock Text="{Binding Text}" Style="{StaticResource Body}" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Expander Header="Full log" Margin="0,10,0,0" Foreground="{DynamicResource TextBrush}" DataContext="{Binding Changes}">
+                  <ItemsControl ItemsSource="{Binding History}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource Subtle}" Margin="0,2" /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Expander>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 7 Settings ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Settings" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="engine" />
+            </StackPanel>
+            <TextBlock Text="Make PerfTuner look and behave the way you like." Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Colour theme" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="themes" />
+                </StackPanel>
+                <TextBlock Text="Changes instantly." Style="{StaticResource Subtle}" Margin="0,2,0,12" />
+                <TextBlock Text="6 classic themes with soft, rounded shapes, and 21 metal themes with sharp, machined edges." Style="{StaticResource Subtle}" Margin="0,-8,0,10" />
+                <TextBlock Text="Classic" Style="{StaticResource H3}" Margin="0,8,0,8" />
+                <ListBox ItemsSource="{Binding ClassicThemes}" SelectedItem="{Binding SelectedClassicTheme}" Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.Template>
+                    <ControlTemplate TargetType="ListBox"><ItemsPresenter /></ControlTemplate>
+                  </ListBox.Template>
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                      <Setter Property="Cursor" Value="Hand" />
+                      <Setter Property="ToolTip" Value="{Binding Name}" />
+                      <Setter Property="Template">
+                        <Setter.Value>
+                          <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd" BorderThickness="2" BorderBrush="Transparent" CornerRadius="{Binding SwatchCorner}" Padding="3" Margin="0,0,8,8">
+                              <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrush}" /></Trigger>
+                              <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                            </ControlTemplate.Triggers>
+                          </ControlTemplate>
+                        </Setter.Value>
+                      </Setter>
+                    </Style>
+                  </ListBox.ItemContainerStyle>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Width="128" Height="80" CornerRadius="{Binding SwatchCorner}" Background="{Binding SwatchBackground}" Padding="9" ClipToBounds="True">
+                        <Grid>
+                          <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                          </Grid.RowDefinitions>
+                          <Border CornerRadius="{Binding SwatchInnerCorner}" Background="{Binding SwatchPlate}" Padding="6" Margin="0,0,0,6">
+                            <Border Height="6" Width="44" CornerRadius="{Binding SwatchInnerCorner}" Background="{Binding Swatch}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                          </Border>
+                          <TextBlock Grid.Row="1" Text="{Binding Name}" Foreground="{Binding SwatchText}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Text="Metal" Style="{StaticResource H3}" Margin="0,8,0,8" />
+                <ListBox ItemsSource="{Binding MetalThemes}" SelectedItem="{Binding SelectedMetalTheme}" Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                  <ListBox.Template>
+                    <ControlTemplate TargetType="ListBox"><ItemsPresenter /></ControlTemplate>
+                  </ListBox.Template>
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                      <Setter Property="Cursor" Value="Hand" />
+                      <Setter Property="ToolTip" Value="{Binding Name}" />
+                      <Setter Property="Template">
+                        <Setter.Value>
+                          <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd" BorderThickness="2" BorderBrush="Transparent" CornerRadius="{Binding SwatchCorner}" Padding="3" Margin="0,0,8,8">
+                              <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrush}" /></Trigger>
+                              <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                            </ControlTemplate.Triggers>
+                          </ControlTemplate>
+                        </Setter.Value>
+                      </Setter>
+                    </Style>
+                  </ListBox.ItemContainerStyle>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Border Width="128" Height="80" CornerRadius="{Binding SwatchCorner}" Background="{Binding SwatchBackground}" Padding="9" ClipToBounds="True">
+                        <Grid>
+                          <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                          </Grid.RowDefinitions>
+                          <Border CornerRadius="{Binding SwatchInnerCorner}" Background="{Binding SwatchPlate}" Padding="6" Margin="0,0,0,6">
+                            <Border Height="6" Width="44" CornerRadius="{Binding SwatchInnerCorner}" Background="{Binding Swatch}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                          </Border>
+                          <TextBlock Grid.Row="1" Text="{Binding Name}" Foreground="{Binding SwatchText}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                  <TextBlock Text="Behaviour" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="behaviour" />
+                </StackPanel>
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding NotificationsOn}" Margin="0,0,0,12"
+                          Content="Show a notification when PerfTuner does something on its own" />
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CloseToTray}" Margin="0,0,0,12"
+                          Content="Keep running in the tray when I close the window" />
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoFixOn}"
+                          Content="Automatic fixes — test and keep fixes for slowdowns on its own" />
+                <TextBlock Text="{Binding OperationMessage}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Background service" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="engine" />
+                </StackPanel>
+                <TextBlock Text="{Binding EngineText}" Style="{StaticResource Body}" Margin="0,6,0,0" />
+                <TextBlock Style="{StaticResource Subtle}" Margin="0,2,0,12"
+                           Text="Nothing to install: PerfTuner runs its own engine while it's open (window or tray). Install the optional always-on service only if you want PerfTuner working before you sign in." />
+                <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Content="Unlock full power (restart as administrator)" Margin="0,0,0,14"
+                        Command="{Binding RestartAsAdministratorCommand}" Visibility="{Binding ShowUnlock, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding ServiceStateText, StringFormat='Always-on service: {0}'}" Style="{StaticResource Body}" />
+                <WrapPanel Margin="0,8,0,0">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Install" Command="{Binding InstallCommand}" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Start" Command="{Binding StartCommand}" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Stop" Command="{Binding StopCommand}" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Uninstall" Command="{Binding UninstallCommand}" />
+                </WrapPanel>
+                <TextBlock Text="{Binding OperationMessage}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+
+            <Expander Header="Technical details" Margin="0,0,0,20" Foreground="{DynamicResource TextBrush}">
+              <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                  </Grid.RowDefinitions>
+                  <TextBlock Grid.Row="0" Text="Connection" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ConnectionText}" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Text="Engine version" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ServerVersion}" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Text="Running for" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding UptimeText}" Margin="0,3" />
+                  <TextBlock Grid.Row="3" Text="Data source" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding TelemetrySource}" TextWrapping="Wrap" Margin="0,3" />
+                  <TextBlock Grid.Row="4" Text="Data health" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding TelemetryHealthTip}" TextWrapping="Wrap" Margin="0,3" />
+                  <TextBlock Grid.Row="5" Text="Safety switch" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding BreakerText}" TextWrapping="Wrap" Margin="0,3" />
+                  <TextBlock Grid.Row="6" Text="PerfTuner's own cost" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="6" Grid.Column="1" Margin="0,3"><Run Text="{Binding OverheadCpuText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding OverheadMemoryText, Mode=OneWay}" /></TextBlock>
+                  <TextBlock Grid.Row="7" Text="Access" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding RoleText}" Margin="0,3" />
+                  <TextBlock Grid.Row="8" Text="Configuration notes" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding ConfigWarnings}" TextWrapping="Wrap" Margin="0,3" />
+                </Grid>
+              </Border>
+            </Expander>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ============================== 8 Scan & Fix ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding Scan}">
+          <StackPanel>
+            <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,0,0,10"
+                    Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="0">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE72B;" FontFamily="{StaticResource IconFont}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="Back to Home" />
+              </StackPanel>
+            </Button>
+            <Border Style="{StaticResource Card}" Background="{DynamicResource HeroGradient}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <c:RingGauge Width="130" Height="130" Value="{Binding Progress}" Thickness="10" Invert="True"
+                             Text="{Binding Progress, StringFormat={}{0:F0}%}" Caption="scan" />
+                <StackPanel Grid.Column="1" Margin="22,0,0,0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Headline}" Style="{StaticResource PageTitle}" FontSize="24" />
+                  <TextBlock Text="{Binding Subline}" Style="{StaticResource Subtle}" Margin="0,4,0,14" FontSize="13.5" />
+                  <WrapPanel>
+                    <Button Style="{StaticResource PrimaryButton}" Content="Start scan" Command="{Binding StartScanCommand}" Margin="0,0,8,0"
+                            Visibility="{Binding IsIdle, Converter={StaticResource BoolToVis}}" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="Fix selected" Command="{Binding FixCommand}" Margin="0,0,8,0"
+                            Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Stop" Command="{Binding StopCommand}" Margin="0,0,8,0"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                    <Button Style="{StaticResource SecondaryButton}" Content="Scan again" Command="{Binding StartScanCommand}" Margin="0,0,8,0"
+                            Visibility="{Binding IsDone, Converter={StaticResource BoolToVis}}" />
+                  </WrapPanel>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource Panel}" Margin="0,0,0,8" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="20" Width="34" />
+                      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <CheckBox Content="Fix" IsChecked="{Binding Selected}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVis}}" Margin="12,0,0,0" />
+                        <Button Style="{StaticResource SecondaryButton}" Content="Open" Padding="12,5" Margin="12,0,0,0"
+                                Visibility="{Binding CanOpen, Converter={StaticResource BoolToVis}}"
+                                Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding Result}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock.Style>
+                          <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource SubtleBrush}" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding State}" Value="Ok"><Setter Property="Foreground" Value="{DynamicResource GoodBrush}" /></DataTrigger>
+                              <DataTrigger Binding="{Binding State}" Value="Fixed"><Setter Property="Foreground" Value="{DynamicResource GoodBrush}" /></DataTrigger>
+                              <DataTrigger Binding="{Binding State}" Value="Issue"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                              <DataTrigger Binding="{Binding State}" Value="Failed"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </TextBlock.Style>
+                      </TextBlock>
+                      <StackPanel Margin="6,0,0,0">
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Subtle}" />
+                      </StackPanel>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <!-- ============================== 9 Help ============================== -->
+      <TabItem>
+        <Grid Margin="32,26,32,24">
+          <Grid.Resources>
+            <CollectionViewSource x:Key="HelpView" Source="{Binding HelpTopicList}">
+              <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Page" />
+              </CollectionViewSource.GroupDescriptions>
+            </CollectionViewSource>
+          </Grid.Resources>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="20" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Help" Style="{StaticResource PageTitle}" Grid.ColumnSpan="3" />
+          <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource PageSubtitle}"
+                     Text="How every part of PerfTuner works. Tip: the small ? next to each section title gives a quick hint and brings you here." />
+          <Border Grid.Row="2" Style="{StaticResource Card}" Padding="8" Margin="0">
+            <ListBox ItemsSource="{Binding Source={StaticResource HelpView}}" SelectedItem="{Binding SelectedHelpTopic}"
+                     Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.GroupStyle>
+                <GroupStyle>
+                  <GroupStyle.HeaderTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}" Style="{StaticResource Subtle}" FontWeight="SemiBold" FontSize="11.5" Margin="8,10,0,4" />
+                    </DataTemplate>
+                  </GroupStyle.HeaderTemplate>
+                </GroupStyle>
+              </ListBox.GroupStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Title}" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" Margin="4,3" />
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
+          <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" DataContext="{Binding SelectedHelpTopic}">
+              <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+                <Border Style="{StaticResource Chip}" HorizontalAlignment="Left" Margin="0,0,0,10">
+                  <TextBlock Text="{Binding Page}" FontSize="11.5" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" FontSize="22" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Hint}" Style="{StaticResource Subtle}" FontSize="14" TextWrapping="Wrap" Margin="0,8,0,16" />
+                <TextBlock Text="{Binding Body}" Style="{StaticResource Body}" TextWrapping="Wrap" LineHeight="22" FontSize="14" />
+                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,22,0,0"
+                        Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding PageIndex}">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Page, StringFormat='Go to {0}'}" />
+                    <TextBlock Text="&#xE72A;" FontFamily="{StaticResource IconFont}" Margin="6,1,0,0" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <!-- ============================== 10 About ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}">
+          <StackPanel MaxWidth="860" HorizontalAlignment="Left">
+            <Border Style="{StaticResource Card}" Background="{DynamicResource HeroGradient}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Image Source="pack://application:,,,/Assets/icon256.png" Width="104" Height="104" RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Margin="22,0,0,0" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="PerfTuner" Style="{StaticResource PageTitle}" />
+                    <Border Style="{StaticResource Chip}" Margin="12,0,0,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding VersionText}" FontSize="12" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Style="{StaticResource Body}" FontSize="14.5" TextWrapping="Wrap" Margin="0,6,0,0"
+                             Text="A safe, reversible performance tuner for Windows 11. It measures what is really slowing your PC down, fixes it with documented Windows features, and can undo every change." />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Grid Margin="0,16,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Idea &amp; creator" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                  <TextBlock Text="Farshid N" Style="{StaticResource H2}" FontSize="20" Margin="0,6,0,0" />
+                  <TextBlock Text="Software and Platform Architect" Style="{StaticResource Subtle}" FontSize="13.5" Margin="0,2,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Grid.Column="2" Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Source code" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                  <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,8,0,0" Command="{Binding OpenRepositoryCommand}"
+                          ToolTip="Open in your web browser">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="&#xE71B;" FontFamily="{StaticResource IconFont}" Margin="0,1,8,0" VerticalAlignment="Center" />
+                      <TextBlock Text="github.com/Farshid1723/PerfTuner" FontSize="14.5" />
+                    </StackPanel>
+                  </Button>
+                  <TextBlock Text="Built in C# with .NET and WPF." Style="{StaticResource Subtle}" Margin="0,8,0,0" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Text="What it can do" Style="{StaticResource H2}" Margin="0,0,0,10" />
+                <ItemsControl>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE73E;" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource AccentBrush}" Margin="0,3,10,0" VerticalAlignment="Top" />
+                        <TextBlock Text="{Binding}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                  <ItemsControl.ItemsSource>
+                    <x:Array Type="sys:String">
+                    <sys:String>Three modes that never overlap: Turbo for maximum speed, Smart for hands-off everyday care, Silent for a cooler, quieter PC.</sys:String>
+                    <sys:String>Frees RAM from background apps, and measures and reports how much was freed.</sys:String>
+                    <sys:String>Measures boot time and the real load cost of every startup app, with clear recommendations.</sys:String>
+                    <sys:String>Finds the cause of slowdowns, stutter, lag and slow disks, and answers in plain words with a fix button.</sys:String>
+                    <sys:String>Automatic fixes are tested before and after, and kept only if they measurably help.</sys:String>
+                    <sys:String>Cleans junk files and switches helpful, documented Windows settings on or off.</sys:String>
+                    <sys:String>Gives any app more or less CPU, puts it in efficiency mode, or sets rules that apply every time it starts.</sys:String>
+                  </x:Array>
+                  </ItemsControl.ItemsSource>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <TextBlock Text="Why you can trust it" Style="{StaticResource H2}" Margin="0,0,0,10" />
+                <ItemsControl>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Left" Text="&#xE83D;" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource GoodBrush}" Margin="0,3,10,0" VerticalAlignment="Top" />
+                        <TextBlock Text="{Binding}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                  <ItemsControl.ItemsSource>
+                    <x:Array Type="sys:String">
+                    <sys:String>Everything is reversible: each change is recorded first and can be undone one by one, or all at once.</sys:String>
+                    <sys:String>No kernel drivers and no hidden tricks. Only documented Windows features are used.</sys:String>
+                    <sys:String>Measured, not guessed: every number comes from Windows' own counters and event tracing.</sys:String>
+                    <sys:String>A safety switch pauses and undoes automatic tuning if the PC ever becomes unstable.</sys:String>
+                    <sys:String>No free-form commands, no shelling out and no file paths taken from the screen. Administrator rights are used only when you agree.</sys:String>
+                    <sys:String>Light and private: nothing leaves your PC, and logs never contain secrets.</sys:String>
+                  </x:Array>
+                  </ItemsControl.ItemsSource>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <!-- ============================== 11 Cockpit ============================== -->
+      <TabItem>
+        <Grid DataContext="{Binding Cockpit}">
+        <ScrollViewer Style="{StaticResource PageScroll}" Visibility="{Binding ShowParts, Converter={StaticResource BoolToVis}}">
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Cockpit" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="cockpit" />
+            </StackPanel>
+            <TextBlock Text="Your PC's machinery, live. Click a part to look inside, find problems and fix them." Style="{StaticResource PageSubtitle}" />
+
+            <!-- four animated tiles -->
+            <ItemsControl ItemsSource="{Binding Parts}" Margin="0,0,-14,4">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Command="{Binding DataContext.SelectPartCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Id}"
+                          Cursor="Hand" Margin="0,0,14,14" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <Button.Template>
+                      <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{DynamicResource PlateBrush}" BorderBrush="{DynamicResource PlateEdgeBrush}" BorderThickness="1"
+                                CornerRadius="{DynamicResource CardRadius}" Padding="16,14" Effect="{StaticResource CardShadow}">
+                          <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></Trigger>
+                          <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
+                            <Setter TargetName="Bd" Property="Padding" Value="15,13" />
+                          </DataTrigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Button.Template>
+                    <StackPanel>
+                      <DockPanel>
+                        <Border DockPanel.Dock="Right" Style="{StaticResource Chip}" VerticalAlignment="Top" Padding="8,2">
+                          <TextBlock Text="{Binding StateText}" FontSize="11" FontWeight="SemiBold">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding StateText}" Value="busy"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                                  <DataTrigger Binding="{Binding StateText}" Value="strained"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                        </Border>
+                        <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                      </DockPanel>
+                      <c:HardwareIcon Width="104" Height="104" Margin="0,8,0,6" Kind="{Binding Kind}" Load="{Binding Load}" State="{Binding State}" CoolDownToken="{Binding CoolDownToken}" />
+                      <TextBlock Text="{Binding Value}" Style="{StaticResource BigNumber}" FontSize="24" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding Detail}" Style="{StaticResource Subtle}" FontSize="11.5" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                      <TextBlock Text="{Binding Note}" Style="{StaticResource Subtle}" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- ============ CPU ============ -->
+            <Border Style="{StaticResource Card}" Visibility="{Binding ShowCpu, Converter={StaticResource BoolToVis}}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Processor" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="cpu-detail" />
+                </StackPanel>
+                <Grid Margin="0,12,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="170" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Grid.RowDefinitions>
+                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                  </Grid.RowDefinitions>
+                  <TextBlock Text="Model" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Column="1" Text="{Binding CpuName}" Style="{StaticResource Body}" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Text="Threads" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CpuCores}" Style="{StaticResource Body}" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Text="Speed now" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CpuSpeedText}" Style="{StaticResource Body}" Margin="0,3" />
+                  <TextBlock Grid.Row="3" Text="Held back?" Style="{StaticResource Subtle}" Margin="0,3" />
+                  <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding CpuThrottleText}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,3" />
+                </Grid>
+                <WrapPanel Margin="0,14,0,0">
+                  <Button Style="{StaticResource PrimaryButton}" Content="Choose a mode (Turbo · Smart · Silent)" Margin="0,0,8,0"
+                          Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="1" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Control a busy app" Margin="0,0,8,0"
+                          Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="4" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- ============ Memory ============ -->
+            <StackPanel Visibility="{Binding ShowMemory, Converter={StaticResource BoolToVis}}">
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                      <Button Style="{StaticResource PrimaryButton}" Content="Free up RAM" Command="{Binding FreeRamCommand}" Margin="0,0,8,0" />
+                      <Button Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding RefreshMemoryCommand}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Memory (RAM)" Style="{StaticResource H2}" />
+                      <c:HelpButton Topic="memory-detail" />
+                    </StackPanel>
+                  </DockPanel>
+                  <Border Height="20" Margin="0,14,0,6" CornerRadius="{DynamicResource ControlRadius}" ClipToBounds="True" Background="{DynamicResource SurfaceAltBrush}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding RamUsedWidth}" />
+                        <ColumnDefinition Width="{Binding RamCacheWidth}" />
+                        <ColumnDefinition Width="{Binding RamFreeWidth}" />
+                      </Grid.ColumnDefinitions>
+                      <Border Background="{DynamicResource AccentGradient}" />
+                      <Border Grid.Column="1" Background="{DynamicResource AccentSoftBrush}" />
+                    </Grid>
+                  </Border>
+                  <TextBlock Text="{Binding RamText}" Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                  <TextBlock Text="Committed memory (what apps have reserved, in RAM and page files)" Style="{StaticResource H3}" Margin="0,16,0,0" />
+                  <ProgressBar Height="12" Margin="0,8,0,6" Maximum="1" Value="{Binding MemorySnapshot.CommitFraction, Mode=OneWay}" />
+                  <TextBlock Text="{Binding CommitText}" Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding MemoryMessage}" Style="{StaticResource Message}" />
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Virtual memory (page file)" Style="{StaticResource H2}" />
+                    <c:HelpButton Topic="virtual-memory" />
+                  </StackPanel>
+                  <TextBlock Text="When RAM is full, Windows moves memory that isn't being used right now to the page file on disk." Style="{StaticResource Subtle}" Margin="0,4,0,10" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding PageFileConfigText}" Style="{StaticResource Body}" />
+                  <ItemsControl ItemsSource="{Binding PageFiles}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Margin="0,0,0,10">
+                          <ProgressBar Height="10" Maximum="1" Value="{Binding UsedFraction, Mode=OneWay}" Margin="0,0,0,4" />
+                          <TextBlock Text="{Binding Text}" Style="{StaticResource Subtle}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <Border CornerRadius="{DynamicResource ControlRadius}" Padding="14,12" Margin="0,8,0,0">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource WarnSoftBrush}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding AdviceIsGood}" Value="True"><Setter Property="Background" Value="{DynamicResource GoodSoftBrush}" /></DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <StackPanel>
+                      <TextBlock Text="{Binding AdviceTitle}" Style="{StaticResource H3}" />
+                      <TextBlock Text="{Binding AdviceText}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                      <Button Style="{StaticResource PrimaryButton}" Content="{Binding AdviceAction}" Command="{Binding ApplyAdviceCommand}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                              Visibility="{Binding HasAdviceAction, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                  </Border>
+                  <Border CornerRadius="{DynamicResource ControlRadius}" Padding="14,10" Margin="0,10,0,0" Background="{DynamicResource AccentSoftBrush}"
+                          Visibility="{Binding RestartPending, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Restart the PC when it suits you to use the new page-file setting. Undo it any time in History." Style="{StaticResource Body}" TextWrapping="Wrap" />
+                  </Border>
+
+                  <Expander Margin="0,14,0,0" Foreground="{DynamicResource TextBrush}" Header="Advanced: set a fixed size yourself">
+                    <StackPanel Margin="0,10,0,0">
+                      <TextBlock Text="Only for special cases (for example software that asks for a fixed page file). Letting Windows manage it is best for almost everyone." Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock Text="Drive" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox ItemsSource="{Binding PageFileDrives}" SelectedItem="{Binding CustomDrive}" Width="80" />
+                        <Slider Width="260" Margin="16,0,0,0" VerticalAlignment="Center" Minimum="{Binding CustomMinGb}" Maximum="{Binding CustomMaxGb}" IsEnabled="{Binding CustomAvailable}"
+                                Value="{Binding CustomGb}" TickFrequency="0.5" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="{Binding CustomGbText}" Style="{StaticResource H3}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        <Button Style="{StaticResource SecondaryButton}" Content="Use this size" Command="{Binding ApplyCustomCommand}" Margin="16,0,0,0" IsEnabled="{Binding CustomAvailable}" />
+                      </StackPanel>
+                      <TextBlock Text="{Binding CustomHint}" Style="{StaticResource Subtle}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Expander>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <!-- ============ Disk ============ -->
+            <StackPanel Visibility="{Binding ShowDisk, Converter={StaticResource BoolToVis}}">
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding RefreshDiskCommand}" VerticalAlignment="Top" />
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="Disk problems" Style="{StaticResource H2}" />
+                      <c:HelpButton Topic="disk-detail" />
+                    </StackPanel>
+                  </DockPanel>
+                  <TextBlock Text="{Binding DiskLatencyText}" Style="{StaticResource Subtle}" Margin="0,4,0,8" />
+                  <StackPanel Orientation="Horizontal" Visibility="{Binding HasNoDiskProblems, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource GoodBrush}" Margin="0,2,8,0" />
+                    <TextBlock Text="No disk problems found." Style="{StaticResource Body}" />
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding DiskProblems}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <DockPanel Margin="0,0,0,10">
+                          <Button DockPanel.Dock="Right" Content="{Binding ActionText}" Margin="12,0,0,0" VerticalAlignment="Top"
+                                  Command="{Binding DataContext.DiskProblemActionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                            <Button.Style>
+                              <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding ActionText}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </Button.Style>
+                          </Button>
+                          <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Margin="0,2,10,0">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource WarnBrush}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Severity}" Value="bad"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                          <TextBlock Text="{Binding Text}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                        </DockPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding DiskMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock Text="Drives" Style="{StaticResource H2}" Margin="0,4,0,10" />
+              <ItemsControl ItemsSource="{Binding Volumes}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Style="{StaticResource Card}">
+                      <StackPanel>
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding Detail.RoleText}" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Detail.Title}" Style="{StaticResource H3}" FontSize="16" />
+                        </DockPanel>
+                        <ProgressBar Height="12" Margin="0,10,0,4" Maximum="1" Value="{Binding Detail.UsedFraction, Mode=OneWay}" />
+                        <TextBlock Text="{Binding Detail.SpaceText}" Style="{StaticResource Subtle}" />
+                        <WrapPanel Margin="0,10,0,0">
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="File system" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding Detail.FileSystemText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Allocation" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding Detail.ClusterText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Health" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding Detail.Health}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Fragmentation" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding Fragmentation}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Error scan" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding ScanResult, TargetNullValue='not scanned', FallbackValue='not scanned'}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                        </WrapPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                          <Button Style="{StaticResource PrimaryButton}" Content="Find what's using space" Margin="0,0,8,0"
+                                  Command="{Binding DataContext.OpenSpaceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <Button Style="{StaticResource SecondaryButton}" Content="Analyze" Margin="0,0,8,0"
+                                  Command="{Binding DataContext.AnalyzeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <Button Style="{StaticResource SecondaryButton}" Content="Optimize" Margin="0,0,8,0" ToolTip="TRIM on SSDs, defragment on hard disks"
+                                  Command="{Binding DataContext.OptimizeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <Button Style="{StaticResource SecondaryButton}" Content="Scan for errors" Margin="0,0,8,0" ToolTip="Online scan — the drive stays usable"
+                                  Command="{Binding DataContext.ScanCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <Button Style="{StaticResource PrimaryButton}" Content="Fix at next restart" Margin="0,0,8,0"
+                                  Visibility="{Binding OfferOfflineFix, Converter={StaticResource BoolToVis}}"
+                                  Command="{Binding DataContext.FixAtRestartCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                        </WrapPanel>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock Text="Physical disks" Style="{StaticResource H2}" Margin="0,4,0,10" />
+              <ItemsControl ItemsSource="{Binding PhysicalDisks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Style="{StaticResource Card}">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" FontSize="16" />
+                        <TextBlock Text="{Binding Summary}" Style="{StaticResource Subtle}" Margin="0,2,0,8" />
+                        <WrapPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Temperature" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding TemperatureText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Wear" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding WearText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Powered on" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding HoursText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                          <StackPanel Margin="0,0,28,8">
+                            <TextBlock Text="Errors" Style="{StaticResource Subtle}" FontSize="11.5" />
+                            <TextBlock Text="{Binding ErrorsText}" Style="{StaticResource Body}" />
+                          </StackPanel>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding Verdict}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <!-- ============ Network ============ -->
+            <Border Style="{StaticResource Card}" Visibility="{Binding ShowNetwork, Converter={StaticResource BoolToVis}}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Network" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="network-detail" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                  <StackPanel Margin="0,0,40,0">
+                    <TextBlock Text="Download" Style="{StaticResource Subtle}" />
+                    <TextBlock Text="{Binding NetDownText}" Style="{StaticResource BigNumber}" FontSize="24" />
+                  </StackPanel>
+                  <StackPanel>
+                    <TextBlock Text="Upload" Style="{StaticResource Subtle}" />
+                    <TextBlock Text="{Binding NetUpText}" Style="{StaticResource BigNumber}" FontSize="24" />
+                  </StackPanel>
+                </StackPanel>
+                <TextBlock Text="{Binding NetHealthText}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                <TextBlock Text="Connected adapters" Style="{StaticResource H3}" Margin="0,16,0,6" />
+                <ItemsControl ItemsSource="{Binding Adapters}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <DockPanel Margin="0,0,0,6">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Speed}" Style="{StaticResource Body}" />
+                        <TextBlock Text="{Binding Kind}" Style="{StaticResource Body}" Width="70" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" />
+                        <TextBlock Text="{Binding Status, StringFormat=' · {0}'}" Style="{StaticResource Subtle}" TextTrimming="CharacterEllipsis" />
+                      </DockPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Style="{StaticResource SecondaryButton}" Content="Check my internet" HorizontalAlignment="Left" Margin="0,12,0,0"
+                        Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="5" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+        <!-- ============ Space explorer (Cockpit sub-view) ============ -->
+        <Grid Margin="32,22,32,18" DataContext="{Binding Space}"
+              Visibility="{Binding DataContext.Cockpit.ShowSpace, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="220" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="230" MinHeight="120" />
+          </Grid.RowDefinitions>
+
+          <!-- header -->
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Style="{StaticResource SecondaryButton}" Content="Stop" Command="{Binding CancelCommand}" Margin="0,0,8,0"
+                      Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+              <Button Style="{StaticResource SecondaryButton}" Content="Scan again" Command="{Binding ScanAgainCommand}" />
+            </StackPanel>
+            <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE72B;" ToolTip="Back to the Cockpit" Margin="0,0,10,0" VerticalAlignment="Center"
+                    Command="{Binding DataContext.Cockpit.BackToCockpitCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Title}" Style="{StaticResource PageTitle}" Margin="0" />
+              <c:HelpButton Topic="space" />
+            </StackPanel>
+          </DockPanel>
+
+          <!-- progress -->
+          <StackPanel Grid.Row="1" Margin="0,10,0,10">
+            <ProgressBar Height="8" Maximum="1" Value="{Binding ProgressFraction, Mode=OneWay}" />
+            <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Subtle}" Margin="0,6,0,0" />
+          </StackPanel>
+
+          <!-- mode switch + breadcrumbs -->
+          <DockPanel Grid.Row="2" Margin="0,0,0,10">
+            <Border DockPanel.Dock="Left" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="{DynamicResource ControlRadius}" Padding="2" Margin="0,0,16,0">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Style="{StaticResource Segment}" GroupName="spaceMode" Content="Tree" IsChecked="{Binding IsTree, Mode=OneWay}" Command="{Binding SetModeCommand}" CommandParameter="tree" />
+                <RadioButton Style="{StaticResource Segment}" GroupName="spaceMode" Content="Treemap" IsChecked="{Binding IsTreemap, Mode=OneWay}" Command="{Binding SetModeCommand}" CommandParameter="treemap" />
+                <RadioButton Style="{StaticResource Segment}" GroupName="spaceMode" Content="Sunburst" IsChecked="{Binding IsSunburst, Mode=OneWay}" Command="{Binding SetModeCommand}" CommandParameter="sunburst" />
+              </StackPanel>
+            </Border>
+            <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE74A;" ToolTip="Up one folder" Command="{Binding UpCommand}" VerticalAlignment="Center" />
+            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Scan this folder again" Command="{Binding RescanFolderCommand}" VerticalAlignment="Center" />
+            <ItemsControl ItemsSource="{Binding Breadcrumbs}" VerticalAlignment="Center" Margin="8,0,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource LinkButton}" Content="{Binding Name}" Padding="2,0"
+                            Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                    <TextBlock Text="›" Style="{StaticResource Subtle}" Margin="4,0" VerticalAlignment="Center" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
+
+          <!-- visual + selection panel -->
+          <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="14" />
+              <ColumnDefinition Width="270" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Card}" Margin="0" Padding="8">
+              <Grid>
+                <!-- tree list -->
+                <DockPanel Visibility="{Binding IsTree, Converter={StaticResource BoolToVis}}">
+                  <Grid DockPanel.Dock="Top" Margin="8,2,8,6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="130" />
+                      <ColumnDefinition Width="50" />
+                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="80" />
+                      <ColumnDefinition Width="90" />
+                      <ColumnDefinition Width="22" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Name" Style="{StaticResource Subtle}" FontSize="11.5" />
+                    <TextBlock Grid.Column="1" Text="Share of parent" Style="{StaticResource Subtle}" FontSize="11.5" />
+                    <TextBlock Grid.Column="3" Text="Size" Style="{StaticResource Subtle}" FontSize="11.5" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="4" Text="Files" Style="{StaticResource Subtle}" FontSize="11.5" HorizontalAlignment="Right" />
+                    <TextBlock Grid.Column="5" Text="Modified" Style="{StaticResource Subtle}" FontSize="11.5" HorizontalAlignment="Right" />
+                  </Grid>
+                  <ListBox x:Name="SpaceTree" ItemsSource="{Binding Rows}" SelectionMode="Extended" Background="Transparent" BorderThickness="0"
+                           VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                           SelectionChanged="OnSpaceTreeSelectionChanged" MouseDoubleClick="OnSpaceTreeDoubleClick">
+                    <ListBox.ItemContainerStyle>
+                      <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="6,2" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="ToolTip" Value="{Binding LockReason}" />
+                        <Setter Property="ToolTipService.IsEnabled" Value="{Binding IsLocked}" />
+                      </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                      <DataTemplate>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="130" />
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="90" />
+                            <ColumnDefinition Width="22" />
+                          </Grid.ColumnDefinitions>
+                          <StackPanel Orientation="Horizontal" Margin="{Binding Indent}">
+                            <Button Width="20" Height="20" Content="{Binding ExpanderGlyph}" FontFamily="{StaticResource IconFont}" FontSize="9" Background="Transparent" BorderThickness="0" Padding="0"
+                                    Foreground="{DynamicResource SubtleBrush}" Focusable="False" Cursor="Hand"
+                                    Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}">
+                              <Button.Template>
+                                <ControlTemplate TargetType="Button"><Border Background="Transparent"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border></ControlTemplate>
+                              </Button.Template>
+                            </Button>
+                            <TextBlock Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="2,0,8,0" />
+                            <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Border Grid.Column="1" Height="9" Margin="0,0,10,0" CornerRadius="{DynamicResource BarRadius}" Background="{DynamicResource SurfaceAltBrush}" ClipToBounds="True">
+                            <Grid>
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding BarFilled}" />
+                                <ColumnDefinition Width="{Binding BarEmpty}" />
+                              </Grid.ColumnDefinitions>
+                              <Border Background="{DynamicResource AccentGradient}" CornerRadius="{DynamicResource BarRadius}" />
+                            </Grid>
+                          </Border>
+                          <TextBlock Grid.Column="2" Text="{Binding ShareText}" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="3" Text="{Binding SizeText}" Foreground="{DynamicResource TextBrush}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="4" Text="{Binding FilesText}" Style="{StaticResource Subtle}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="5" Text="{Binding ModifiedText}" Style="{StaticResource Subtle}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="6" Text="&#xE72E;" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource SubtleBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                     Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+                </DockPanel>
+                <c:TreemapView x:Name="SpaceTreemap" Folder="{Binding CurrentFolder}" Selected="{Binding Selected}" Version="{Binding Version}"
+                               Visibility="{Binding IsTreemap, Converter={StaticResource BoolToVis}}" />
+                <c:SunburstView x:Name="SpaceSunburst" Folder="{Binding CurrentFolder}" Selected="{Binding Selected}" Version="{Binding Version}"
+                                Visibility="{Binding IsSunburst, Converter={StaticResource BoolToVis}}" />
+              </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0" Padding="16,14">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <TextBlock Text="Selection" Style="{StaticResource Subtle}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectionText}" Style="{StaticResource H3}" TextWrapping="Wrap" Margin="0,4,0,4" />
+                <TextBlock Text="{Binding SelectionDetail}" Style="{StaticResource Subtle}" TextWrapping="Wrap" FontSize="12" />
+                <UniformGrid Columns="2" Margin="0,12,0,0">
+                  <Button Style="{StaticResource SecondaryButton}" Content="Show in Explorer" Command="{Binding ShowInExplorerCommand}" Margin="0,0,4,0" HorizontalAlignment="Stretch" Padding="6,7" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Move to…" Command="{Binding MoveCommand}" IsEnabled="{Binding CanAct}" Margin="4,0,0,0" HorizontalAlignment="Stretch" Padding="6,7" />
+                </UniformGrid>
+                <Button Style="{StaticResource PrimaryButton}" Content="Delete (Recycle Bin)" Command="{Binding RecycleCommand}" IsEnabled="{Binding CanAct}" Margin="0,8,0,0" HorizontalAlignment="Stretch" />
+                <Border Margin="0,10,0,0" Padding="10,8" CornerRadius="{DynamicResource ControlRadius}" Background="{DynamicResource BadSoftBrush}">
+                  <StackPanel>
+                    <CheckBox Content="I understand this can't be undone" IsChecked="{Binding PermanentConfirmed}" Foreground="{DynamicResource TextBrush}" FontSize="12" />
+                    <Button Content="Delete permanently" Command="{Binding DeletePermanentlyCommand}" IsEnabled="{Binding CanAct}" Margin="0,8,0,0" HorizontalAlignment="Stretch"
+                            Foreground="White" Background="{DynamicResource BadBrush}" BorderThickness="0" Padding="12,7" Cursor="Hand">
+                      <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                          <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource ControlRadius}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" />
+                          </Border>
+                          <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.45" /></Trigger>
+                          </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                      </Button.Template>
+                    </Button>
+                  </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+              </ScrollViewer>
+            </Border>
+          </Grid>
+
+          <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" Height="8" Background="Transparent" ResizeDirection="Rows" Cursor="SizeNS" />
+
+          <!-- reports -->
+          <Border Grid.Row="5" Style="{StaticResource Card}" Margin="0" Padding="12,10">
+            <DockPanel>
+              <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding Categories}" SelectedItem="{Binding ReportCategory}" Width="200"
+                          Visibility="{Binding ShowCategoryPicker, Converter={StaticResource BoolToVis}}" />
+                <TextBlock DockPanel.Dock="Left" Text="Reports" Style="{StaticResource H3}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                <ListBox ItemsSource="{Binding ReportKinds}" SelectedItem="{Binding ReportKind}" Background="Transparent" BorderThickness="0">
+                  <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ListBox.ItemsPanel>
+                  <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                      <Setter Property="Cursor" Value="Hand" />
+                      <Setter Property="Template">
+                        <Setter.Value>
+                          <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Bd" CornerRadius="{DynamicResource PillRadius}" Padding="12,4" Margin="0,0,6,0" Background="{DynamicResource SurfaceAltBrush}">
+                              <ContentPresenter TextElement.Foreground="{DynamicResource TextBrush}" TextElement.FontSize="12" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                              <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Bd" Property="TextElement.Foreground" Value="{DynamicResource OnAccentBrush}" />
+                              </Trigger>
+                            </ControlTemplate.Triggers>
+                          </ControlTemplate>
+                        </Setter.Value>
+                      </Setter>
+                    </Style>
+                  </ListBox.ItemContainerStyle>
+                </ListBox>
+              </DockPanel>
+              <TextBlock DockPanel.Dock="Top" Text="{Binding ReportNote}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,0,0,6" />
+              <ListView x:Name="SpaceReport" ItemsSource="{Binding ReportRows}" SelectionMode="Extended" Background="Transparent" BorderThickness="0"
+                        SelectionChanged="OnSpaceReportSelectionChanged" VirtualizingPanel.IsVirtualizing="True">
+                <ListView.View>
+                  <GridView>
+                    <GridViewColumn Header="Name" Width="260" DisplayMemberBinding="{Binding Name}" />
+                    <GridViewColumn Header="Size" Width="90" DisplayMemberBinding="{Binding SizeText}" />
+                    <GridViewColumn Header="Modified" Width="95" DisplayMemberBinding="{Binding Date}" />
+                    <GridViewColumn Header="Type" Width="160" DisplayMemberBinding="{Binding Type}" />
+                    <GridViewColumn Header="Folder" Width="420" DisplayMemberBinding="{Binding Folder}" />
+                  </GridView>
+                </ListView.View>
+              </ListView>
+            </DockPanel>
+          </Border>
+        </Grid>
+        </Grid>
+      </TabItem>
+      <!-- ============================== 12 Security ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding Security}">
+          <StackPanel>
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Style="{StaticResource SecondaryButton}" Content="Copy report" Command="{Binding CopyReportCommand}" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Check again" Command="{Binding ScanCommand}" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Security" Style="{StaticResource PageTitle}" />
+                <c:HelpButton Topic="security" />
+              </StackPanel>
+            </DockPanel>
+            <TextBlock Text="Finds gaps in Windows' protection and explains them in plain words. Nothing changes until you review and approve a fix." Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}" Background="{DynamicResource HeroGradient}">
+              <DockPanel>
+                <c:RingGauge DockPanel.Dock="Left" Width="96" Height="96" Value="{Binding ScorePercent}" Invert="True" Thickness="9" Text="{Binding ScorePercent, StringFormat={}{0:F0}}" Caption="score" Margin="0,0,20,0" />
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="{Binding ScoreText}" Style="{StaticResource H2}" FontSize="22" />
+                  <TextBlock Text="{Binding Summary}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                  <ProgressBar IsIndeterminate="True" Height="3" Margin="0,10,0,0" Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+                  <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding Groups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                      <DockPanel Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource H2}" />
+                      </DockPanel>
+                      <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Style="{StaticResource Panel}" Margin="0,0,0,8" Padding="14,12">
+                              <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}" FontFamily="{StaticResource IconFont}" FontSize="18" Margin="0,2,14,0" VerticalAlignment="Top">
+                                  <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                      <Setter Property="Foreground" Value="{DynamicResource SubtleBrush}" />
+                                      <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="Good"><Setter Property="Foreground" Value="{DynamicResource GoodBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="Warn"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="Bad"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="Info"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                                      </Style.Triggers>
+                                    </Style>
+                                  </TextBlock.Style>
+                                </TextBlock>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                  <Button Style="{StaticResource SecondaryButton}" Content="{Binding OpenText}" Padding="12,5" Margin="0,0,8,0"
+                                          Visibility="{Binding HasOpen, Converter={StaticResource BoolToVis}}"
+                                          Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}" />
+                                  <Button Style="{StaticResource PrimaryButton}" Content="Review fix…" Padding="12,5" ToolTip="{Binding FixText}"
+                                          Visibility="{Binding HasFix, Converter={StaticResource BoolToVis}}"
+                                          Command="{Binding DataContext.FixCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}" />
+                                </StackPanel>
+                                <StackPanel>
+                                  <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                                    <Border Style="{StaticResource Chip}" Margin="10,0,0,0" Padding="8,1" VerticalAlignment="Center">
+                                      <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SubtleBrush}" />
+                                    </Border>
+                                  </StackPanel>
+                                  <TextBlock Text="{Binding Found}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                  <TextBlock Text="{Binding Why}" Style="{StaticResource Subtle}" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0" />
+                                </StackPanel>
+                              </DockPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <!-- ============================== 13 Get apps ============================== -->
+      <TabItem>
+        <Grid Margin="32,26,32,20" DataContext="{Binding AppStore}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Get apps" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="get-apps" />
+            </StackPanel>
+            <TextBlock Text="Pick apps, then install, update or remove them in one go with Microsoft's Windows Package Manager. Nothing runs until you confirm the list." Style="{StaticResource PageSubtitle}" />
+          </StackPanel>
+          <DockPanel Grid.Row="1" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+              <CheckBox Content="Installed only" IsChecked="{Binding InstalledOnly}" VerticalAlignment="Center" Margin="0,0,14,0" Foreground="{DynamicResource TextBrush}" />
+              <Button Style="{StaticResource SecondaryButton}" Content="Check what's installed" Command="{Binding CheckInstalledCommand}" />
+            </StackPanel>
+            <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Width="190" Margin="0,0,10,0" />
+            <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search by name or description" Width="300" HorizontalAlignment="Left" />
+          </DockPanel>
+          <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Width="262" Height="98" Margin="0,0,10,10" Padding="10,9" Cursor="Hand" BorderThickness="2"
+                          CornerRadius="{DynamicResource ControlRadius}">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                        <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsFocused}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource SubtleBrush}" /></DataTrigger>
+                          <DataTrigger Binding="{Binding IsSelected}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <Border.InputBindings>
+                      <MouseBinding Gesture="LeftClick" Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                    </Border.InputBindings>
+                    <DockPanel>
+                      <Grid DockPanel.Dock="Left" Width="36" Height="36" VerticalAlignment="Top" Margin="0,2,10,0">
+                        <Border CornerRadius="8" Background="{Binding BadgeBrush}" Visibility="{Binding NoIcon, Converter={StaticResource BoolToVis}}">
+                          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Image Source="{Binding Icon}" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality"
+                               Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                      </Grid>
+                      <TextBlock DockPanel.Dock="Right" FontFamily="{StaticResource IconFont}" Text="&#xE73E;" FontSize="14" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Top"
+                                 Visibility="{Binding IsSelected, Converter={StaticResource BoolToVis}}" />
+                      <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" MaxWidth="150" ToolTip="{Binding Name}" />
+                          <TextBlock Text=" ●" Foreground="{DynamicResource GoodBrush}" FontSize="11" VerticalAlignment="Center" ToolTip="Open source"
+                                     Visibility="{Binding OpenSource, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" FontSize="11.5" TextWrapping="Wrap" MaxHeight="32" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                        <TextBlock Text="Installed" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource GoodBrush}" Margin="0,3,0,0"
+                                   Visibility="{Binding IsManaged, Converter={StaticResource BoolToVis}}" />
+                        <TextBlock Text="Installed (another way)" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource WarnBrush}" Margin="0,3,0,0"
+                                   Visibility="{Binding IsElsewhere, Converter={StaticResource BoolToVis}}" />
+                      </StackPanel>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+            <!-- Details of the app you clicked last -->
+            <Border x:Name="AppDetails" Grid.Column="1" Style="{StaticResource Card}" Margin="6,0,0,10" Padding="18,16">
+              <Grid>
+                <TextBlock Text="Click an app to see its details here." Style="{StaticResource Subtle}" TextWrapping="Wrap"
+                           Visibility="{Binding NothingFocused, Converter={StaticResource BoolToVis}}" />
+                <ScrollViewer VerticalScrollBarVisibility="Auto" DataContext="{Binding Focused}"
+                              Visibility="{Binding DataContext.HasFocused, ElementName=AppDetails, Converter={StaticResource BoolToVis}}">
+                  <StackPanel>
+                    <DockPanel>
+                      <Grid DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,12,0">
+                        <Border CornerRadius="10" Background="{Binding BadgeBrush}" Visibility="{Binding NoIcon, Converter={StaticResource BoolToVis}}">
+                          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Image Source="{Binding Icon}" Width="44" Height="44" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}" />
+                      </Grid>
+                      <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource H2}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Category}" Style="{StaticResource Subtle}" />
+                      </StackPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding Description}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock Text="{Binding StateText}" Style="{StaticResource H3}" Margin="0,12,0,0" />
+                    <TextBlock Text="{Binding FoundText}" Style="{StaticResource Subtle}" TextWrapping="Wrap" />
+                    <TextBlock Text="Windows Package Manager can't update or remove this copy. It usually updates itself; to manage it here, uninstall it in Settings › Apps, then install it here." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,4,0,0"
+                               Visibility="{Binding IsElsewhere, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                    <TextBlock Style="{StaticResource Subtle}" Margin="0,10,0,0" TextWrapping="Wrap"><Run Text="{Binding PackageText, Mode=OneWay}" /></TextBlock>
+                    <TextBlock Text="From the package repository" Style="{StaticResource H3}" Margin="0,14,0,4" />
+                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,2,0,6"
+                                 Visibility="{Binding DataContext.DetailBusy, ElementName=AppDetails, Converter={StaticResource BoolToVis}}" />
+                    <ItemsControl ItemsSource="{Binding DataContext.DetailLines, ElementName=AppDetails}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding}" Style="{StaticResource Subtle}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,2" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </ScrollViewer>
+              </Grid>
+            </Border>
+          </Grid>
+          <StackPanel Grid.Row="3" Margin="0,8,0,0">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Style="{StaticResource SecondaryButton}" Content="Clear selection" Command="{Binding ClearSelectionCommand}" Margin="0,0,8,0" />
+                <Button Style="{StaticResource SecondaryButton}" Content="Update all apps" Command="{Binding UpgradeAllCommand}" Margin="0,0,8,0" />
+                <Button Style="{StaticResource SecondaryButton}" Content="Uninstall" Command="{Binding UninstallCommand}" Margin="0,0,8,0" />
+                <Button Style="{StaticResource SecondaryButton}" Content="Update" Command="{Binding UpgradeCommand}" Margin="0,0,8,0" />
+                <Button Style="{StaticResource PrimaryButton}" Content="Install" Command="{Binding InstallCommand}" />
+              </StackPanel>
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource Body}"><Run Text="{Binding SelectedCount, Mode=OneWay}" /><Run Text=" selected · ● open source · click a tile to select it and see its details" /></TextBlock>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel Margin="0,6,0,0" Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}">
+              <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Stop after this app" Command="{Binding StopCommand}" />
+              <TextBlock Text="{Binding Progress}" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
+            </DockPanel>
+            <ProgressBar IsIndeterminate="True" Height="3" Margin="0,4,0,0" Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+            <Expander Header="Activity log" IsExpanded="{Binding LogOpen}" Margin="0,6,0,0" Foreground="{DynamicResource TextBrush}">
+              <ListBox ItemsSource="{Binding Log}" Height="150" FontFamily="Consolas" FontSize="11.5" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubtleBrush}" />
+            </Expander>
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <!-- ============================== 14 Windows ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding SystemSettings}">
+          <ScrollViewer.Resources>
+            <CollectionViewSource x:Key="TweakGroups" Source="{Binding Tweaks}">
+              <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Category" />
+              </CollectionViewSource.GroupDescriptions>
+            </CollectionViewSource>
+          </ScrollViewer.Resources>
+          <StackPanel>
+            <TextBlock Text="Windows" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Documented Windows settings, Windows Update behaviour, optional Windows features and DNS. Every setting can be switched back." Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Windows settings" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="tweaks" />
+                </StackPanel>
+                <TextBlock Text="Hand-picked, documented Windows settings. Switch one on, and off again to restore exactly what you had." Style="{StaticResource Subtle}" Margin="0,4,0,4" />
+                <ItemsControl ItemsSource="{Binding Source={StaticResource TweakGroups}}">
+                  <ItemsControl.GroupStyle>
+                    <GroupStyle>
+                      <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" Foreground="{DynamicResource AccentBrush}" Margin="0,10,0,8" />
+                        </DataTemplate>
+                      </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                  </ItemsControl.GroupStyle>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                        <DockPanel>
+                          <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" Margin="16,0,0,0"
+                                    IsChecked="{Binding Applied, Mode=OneWay}"
+                                    Command="{Binding DataContext.ToggleTweakCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}" />
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding Meta}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,4,0,0" Opacity="0.8" />
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Make it snappy" Command="{Binding BestPerformanceVisualsCommand}" VerticalAlignment="Center" />
+                    <StackPanel>
+                      <TextBlock Text="Faster animations" Style="{StaticResource H3}" />
+                      <TextBlock Text="{Binding VisualEffectsState}" Style="{StaticResource Subtle}" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+                <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                  <DockPanel>
+                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" IsChecked="{Binding TransparencyOn, Mode=OneWay}" Command="{Binding ToggleTransparencyCommand}" />
+                    <StackPanel>
+                      <TextBlock Text="See-through windows (transparency)" Style="{StaticResource H3}" />
+                      <TextBlock Text="Turning it off saves a little GPU work on older PCs." Style="{StaticResource Subtle}" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+                <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Turn off" Command="{Binding DisablePointerPrecisionCommand}" VerticalAlignment="Center" />
+                    <StackPanel>
+                      <TextBlock Text="Precise mouse (no acceleration)" Style="{StaticResource H3}" />
+                      <TextBlock Text="{Binding PointerPrecisionState}" Style="{StaticResource Subtle}" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" />
+              </StackPanel>
+            </Border>
+
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding DataContext.WindowsPage, RelativeSource={RelativeSource AncestorType=Window}}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Windows features" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="windows-features" />
+                </StackPanel>
+                <TextBlock Text="Optional parts of Windows, turned on or off with Windows' own servicing engine (like “Turn Windows features on or off”)." Style="{StaticResource Subtle}" Margin="0,4,0,12" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Features}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Style="{StaticResource Panel}" Margin="0,0,0,8">
+                        <DockPanel>
+                          <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" Margin="16,0,0,0"
+                                    IsChecked="{Binding IsOn, Mode=OneWay}" IsEnabled="{Binding CanChange}"
+                                    Command="{Binding DataContext.ToggleFeatureCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding StateText}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" />
+                            <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding FeatureProgress}" Style="{StaticResource Subtle}" />
+                <TextBlock Text="{Binding FeatureMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" DataContext="{Binding DataContext.WindowsPage, RelativeSource={RelativeSource AncestorType=Window}}">
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="DNS" Style="{StaticResource H2}" />
+                  <c:HelpButton Topic="dns" />
+                </StackPanel>
+                <TextBlock Text="Which servers translate web addresses for this PC (IPv4; on networks that also hand out IPv6 DNS servers, Windows may use those too). Your current setting is saved first, so you can always go back." Style="{StaticResource Subtle}" Margin="0,4,0,8" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding DnsNow}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                <StackPanel Orientation="Horizontal">
+                  <ComboBox ItemsSource="{Binding DnsProviders}" SelectedItem="{Binding SelectedDns}" DisplayMemberPath="Name" Width="320" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource PrimaryButton}" Content="Use it" Command="{Binding ApplyDnsCommand}" Margin="0,0,8,0" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Restore previous" Command="{Binding RestoreDnsCommand}"
+                          Visibility="{Binding CanRestoreDns, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+                <TextBlock Text="{Binding SelectedDns.Description}" Style="{StaticResource Subtle}" Margin="0,6,0,0" />
+                <TextBlock Text="{Binding DnsMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </Grid>
+  </Grid>
+  </Border>
+</Window>

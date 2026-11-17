@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Wire contract shared by the service and every client.
+    Pure, portable (no Windows APIs) so it is unit-testable anywhere.
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerTfm)</TargetFramework>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+</Project>

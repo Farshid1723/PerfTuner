@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Release packer: turns the published app folder + the launcher into PerfTuner-Portable.exe and PerfTuner-Setup.exe. -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerTfm)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Build tool run with "dotnet run": no exe host, so the Global-only runtime search doesn't apply. -->
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PerfTuner.Core\PerfTuner.Core.csproj" />
+  </ItemGroup>
+</Project>

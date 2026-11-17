@@ -1,0 +1,26 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{xml,xaml,csproj,props,targets,json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:suggestion
+dotnet_sort_system_directives_first = true
+csharp_style_var_for_built_in_types = true:suggestion
+dotnet_style_readonly_field = true:warning
+
+# Hot-path discipline: flag LINQ/closures via review; these analyzers help.
+dotnet_diagnostic.CA1822.severity = suggestion
+# Logging: structured templates are enforced by CA2254 (constant templates).
+dotnet_diagnostic.CA2254.severity = warning
+# P/Invoke: prefer LibraryImport (source-generated, no runtime marshalling stubs).
+dotnet_diagnostic.SYSLIB1054.severity = warning

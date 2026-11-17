@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Platform-independent engine logic: data structures, policies, validation.
+    No Windows APIs here, so everything is unit-testable on any OS and in CI.
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerTfm)</TargetFramework>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PerfTuner.Contracts\PerfTuner.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PerfTuner.Core.Tests" />
+  </ItemGroup>
+</Project>

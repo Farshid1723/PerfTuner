@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Client side of the IPC contract + service management (SCM). Used by the GUI and the CLI probe. -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerWindowsTfm)</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PerfTuner.Contracts\PerfTuner.Contracts.csproj" />
+    <ProjectReference Include="..\PerfTuner.Core\PerfTuner.Core.csproj" />
+    <ProjectReference Include="..\PerfTuner.Platform.Windows\PerfTuner.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-tests:
+    # Contracts + Core are OS-independent: fast feedback on Linux.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet test tests/PerfTuner.Core.Tests -c Release --logger trx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+
+  windows-build:
+    runs-on: windows-latest
+    needs: portable-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build PerfTuner.sln -c Release
+      - run: dotnet test tests/PerfTuner.Core.Tests -c Release --no-build
+      - run: ./build/publish.ps1
+        shell: pwsh
+      # Smoke test: dev-mode service + CLI (non-elevated → PDH fallback path) + IPC self-test.
+      - name: IPC smoke + security self-test
+        shell: pwsh
+        run: |
+          $svc = Start-Process artifacts/PerfTuner/Service/PerfTuner.Service.exe -ArgumentList '--console' -PassThru -WindowStyle Hidden
+          Start-Sleep 5
+          try {
+            artifacts/cli/perftuner-cli.exe --dev --samples 3; if ($LASTEXITCODE) { throw "monitor failed" }
+            artifacts/cli/perftuner-cli.exe --dev --selftest;  if ($LASTEXITCODE) { throw "self-test failed" }
+            artifacts/cli/perftuner-cli.exe --dev --tuning-selftest; if ($LASTEXITCODE) { throw "tuning self-test failed" }
+            artifacts/cli/perftuner-cli.exe --dev --forensics; if ($LASTEXITCODE) { throw "forensics check failed" }
+            artifacts/cli/perftuner-cli.exe --dev --experiment-selftest; if ($LASTEXITCODE) { throw "experiment self-test failed" }
+          } finally { Stop-Process -Id $svc.Id -Force }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: perftuner-win-x64
+          path: artifacts/

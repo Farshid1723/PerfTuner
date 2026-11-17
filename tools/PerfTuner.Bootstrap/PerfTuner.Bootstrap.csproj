@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The release launcher. A framework-dependent single-file exe of a few hundred KB: it needs the Microsoft .NET 9
+    Desktop Runtime (like PerfTuner itself). If the runtime is missing, Windows' .NET host shows Microsoft's own
+    "install .NET Desktop Runtime" prompt with the download link before any of this code runs.
+    The release packer appends the app (one Brotli stream: file list, then each distinct file) plus a footer:
+      mode P = PerfTuner-Portable.exe, mode S = PerfTuner-Setup.exe, mode U = PerfTuner-Uninstall.exe (no payload).
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerWindowsTfm)</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <!-- Binds the launcher to the Desktop Runtime, so a missing runtime is reported as the one PerfTuner needs. -->
+    <UseWPF>true</UseWPF>
+    <AssemblyName>PerfTuner-Bootstrap</AssemblyName>
+    <RootNamespace>PerfTuner.Bootstrap</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\src\PerfTuner.App\Assets\app.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <StartupHookSupport>false</StartupHookSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- UseWPF drops System.IO from the implicit usings; this launcher uses no WPF types. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Two small, dependency-free files shared with Core (compiled in, so the exe stays tiny). -->
+    <Compile Include="..\..\src\PerfTuner.Core\Setup\PayloadManifest.cs" Link="Shared\PayloadManifest.cs" />
+    <Compile Include="..\..\src\PerfTuner.Core\Security\PathGuard.cs" Link="Shared\PathGuard.cs" />
+  </ItemGroup>
+</Project>

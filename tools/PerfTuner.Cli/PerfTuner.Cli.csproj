@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Diagnostic console client: connectivity check, live metrics, and IPC security self-test. -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerWindowsTfm)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>perftuner-cli</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\..\src\PerfTuner.App\Assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PerfTuner.Client\PerfTuner.Client.csproj" />
+  </ItemGroup>
+</Project>

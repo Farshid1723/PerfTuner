@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Thin, audited layer over Win32. All P/Invoke lives here and uses source-generated
+    LibraryImport (no runtime marshalling stubs, no reflection).
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerWindowsTfm)</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
+    <PackageReference Include="System.Management" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PerfTuner.Contracts\PerfTuner.Contracts.csproj" />
+    <ProjectReference Include="..\PerfTuner.Core\PerfTuner.Core.csproj" />
+  </ItemGroup>
+</Project>

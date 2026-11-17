@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Micro-benchmarks for the hot paths. See docs/PERFORMANCE.md for how to run. -->
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerTfm)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- BenchmarkDotNet generates code that trips some analyzers. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PerfTuner.Contracts\PerfTuner.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\PerfTuner.Core\PerfTuner.Core.csproj" />
+  </ItemGroup>
+</Project>

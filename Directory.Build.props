@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Solution-wide build policy. Every project inherits these settings.
+    The target frameworks are centralised here so moving to a newer .NET
+    (e.g. net10.0 LTS) is a two-line change.
+  -->
+  <PropertyGroup>
+    <PerfTunerTfm>net9.0</PerfTunerTfm>
+    <PerfTunerWindowsTfm>net9.0-windows</PerfTunerWindowsTfm>
+    <!-- GUI: plain net9.0-windows (no Windows SDK projection: it alone added 25 MB to the app). -->
+    <PerfTunerGuiTfm>net9.0-windows</PerfTunerGuiTfm>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- Lets the Windows-only projects compile on Linux CI / WSL. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!--
+      Every PerfTuner exe runs elevated: its .NET host may only use the machine-wide .NET install, never a hostfxr.dll
+      next to the exe or one named by DOTNET_ROOT (a planted copy in Downloads would otherwise run as administrator).
+    -->
+    <AppHostDotNetSearch>Global</AppHostDotNetSearch>
+
+    <Version>0.10.1</Version>
+    <Company>PerfTuner</Company>
+    <Product>Win11 Performance Tuner</Product>
+    <Copyright>Copyright (c) PerfTuner contributors</Copyright>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>$(PerfTunerWindowsTfm)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>PerfTuner.Service</AssemblyName>
+    <RootNamespace>PerfTuner.Service</RootNamespace>
+    <UserSecretsId />
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon>..\PerfTuner.App\Assets\app.ico</ApplicationIcon>
+
+    <!--
+      Footprint tuning for an always-on service:
+      - Workstation, non-concurrent GC: no background GC thread, smallest heap.
+      - ConserveMemory: GC compacts more aggressively to keep the heap small.
+      - TieredPGO stays on (default) so hot paths get optimised after warm-up.
+    -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <StartupHookSupport>false</StartupHookSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+    <RuntimeHostConfigurationOption Include="System.GC.RetainVM" Value="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PerfTuner.Contracts\PerfTuner.Contracts.csproj" />
+    <ProjectReference Include="..\PerfTuner.Core\PerfTuner.Core.csproj" />
+    <ProjectReference Include="..\PerfTuner.Platform.Windows\PerfTuner.Platform.Windows.csproj" />
+  </ItemGroup>
+  <!-- TraceEvent ships the DIA symbol reader (2 MB); PerfTuner never resolves symbols, so it isn't published. -->
+  <Target Name="DropSymbolReader" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)amd64\msdia140.dll;$(PublishDir)x86\msdia140.dll;$(PublishDir)arm64\msdia140.dll" />
+  </Target>
+  <ItemGroup>
+    <None Include="config.default.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
