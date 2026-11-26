@@ -1362,7 +1362,54 @@
                       </TextBlock>
                       <StackPanel Margin="6,0,0,0">
                         <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" />
-                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Subtle}" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVis}}" />
+                        <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding ToggleDetailsCommand}"
+                                Visibility="{Binding HasChoices, Converter={StaticResource BoolToVis}}">
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="{StaticResource IconFont}" FontSize="10" VerticalAlignment="Center" Margin="0,0,6,0">
+                              <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                  <Setter Property="Text" Value="&#xE76C;" />
+                                  <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Expanded}" Value="True"><Setter Property="Text" Value="&#xE70D;" /></DataTrigger>
+                                  </Style.Triggers>
+                                </Style>
+                              </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding DetailsLabel}" />
+                          </StackPanel>
+                        </Button>
+                        <ItemsControl ItemsSource="{Binding Choices}" Margin="0,6,0,0" Visibility="{Binding Expanded, Converter={StaticResource BoolToVis}}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid Margin="0,0,0,6">
+                                <CheckBox IsChecked="{Binding Selected}" Visibility="{Binding Selectable, Converter={StaticResource BoolToVis}}"
+                                          IsEnabled="{Binding DataContext.HasResults, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+                                  <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap"
+                                               Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                  </StackPanel>
+                                </CheckBox>
+                                <StackPanel Orientation="Horizontal">
+                                  <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                      <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Selectable}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                      </Style.Triggers>
+                                    </Style>
+                                  </StackPanel.Style>
+                                  <TextBlock Text="•" Style="{StaticResource Subtle}" Margin="2,0,8,0" />
+                                  <StackPanel>
+                                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap"
+                                               Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}" />
+                                  </StackPanel>
+                                </StackPanel>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                       </StackPanel>
                     </DockPanel>
                   </Border>

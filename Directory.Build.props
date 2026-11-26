@@ -28,7 +28,7 @@
     -->
     <AppHostDotNetSearch>Global</AppHostDotNetSearch>
 
-    <Version>0.10.1</Version>
+    <Version>0.10.2</Version>
     <Company>PerfTuner</Company>
     <Product>Win11 Performance Tuner</Product>
     <Copyright>Copyright (c) PerfTuner contributors</Copyright>

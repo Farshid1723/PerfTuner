@@ -18,8 +18,31 @@ public enum ScanState { Pending, Running, Ok, Issue, Info, Fixed, Failed }
 /// <summary>What pressing Fix does for an item. Only real, measured findings; only safe, mostly reversible fixes.</summary>
 public enum FixKind { None, CleanTemp, RamRefresh, CalmHogs, FastVisuals, QuickSwitches, OpenPage }
 
+/// <summary>One line in a scan result's details. Lines with a tick box are individual fixes the user can pick.</summary>
+public sealed partial class ScanChoice : ObservableObject
+{
+    public required string Title { get; init; }
+    public string Description { get; init; } = "";
+    public bool Selectable { get; init; }
+    public object? Payload { get; init; }
+    [ObservableProperty] private bool _selected;
+    public bool HasDescription => Description.Length > 0;
+}
+
 public sealed partial class ScanItem : ObservableObject
 {
+    private bool _syncing;
+
+    public ScanItem()
+    {
+        Choices.CollectionChanged += (_, e) =>
+        {
+            foreach (ScanChoice c in e.NewItems ?? Array.Empty<ScanChoice>()) { c.PropertyChanged += OnChoiceChanged; }
+            OnPropertyChanged(nameof(HasChoices));
+            OnPropertyChanged(nameof(DetailsLabel));
+        };
+    }
+
     public required string Name { get; init; }
     public required string Glyph { get; init; }
     public required string Hint { get; init; }
@@ -31,12 +54,46 @@ public sealed partial class ScanItem : ObservableObject
     [ObservableProperty] private FixKind _fix;
     [ObservableProperty] private int _openPage = -1;
 
+    [ObservableProperty] private bool _expanded;
+
     public int Weight { get; set; }
     public object? Payload { get; set; }
+
+    /// <summary>What the result is made of: the settings, apps or drives behind the one-line summary.</summary>
+    public ObservableCollection<ScanChoice> Choices { get; } = [];
+    public bool HasChoices => Choices.Count > 0;
+    public bool HasSelectableChoices => Choices.Any(c => c.Selectable);
+    public IEnumerable<ScanChoice> SelectedChoices => Choices.Where(c => c.Selectable && c.Selected);
+    public string DetailsLabel => Choices.Count == 1 ? "Show details (1)" : $"Show details ({Choices.Count})";
+
+    [RelayCommand]
+    private void ToggleDetails() => Expanded = !Expanded;
+
+    // The row's "Fix" box and the per-line boxes stay in step: ticking Fix picks every line,
+    // unticking every line clears Fix, and picking any line ticks Fix.
+    partial void OnSelectedChanged(bool value)
+    {
+        if (_syncing || !HasSelectableChoices) { return; }
+        _syncing = true;
+        if (value && !SelectedChoices.Any()) { foreach (var c in Choices.Where(c => c.Selectable)) { c.Selected = true; } }
+        else if (!value) { foreach (var c in Choices) { c.Selected = false; } }
+        _syncing = false;
+    }
+
+    private void OnChoiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (_syncing || e.PropertyName != nameof(ScanChoice.Selected)) { return; }
+        _syncing = true;
+        Selected = SelectedChoices.Any();
+        _syncing = false;
+    }
 
     public bool CanFix => Fix is not (FixKind.None or FixKind.OpenPage) && State == ScanState.Issue;
     public bool CanOpen => Fix == FixKind.OpenPage && OpenPage >= 0;
 
+    public bool HasDetail => Detail.Length > 0;
+
+    partial void OnDetailChanged(string value) => OnPropertyChanged(nameof(HasDetail));
     partial void OnStateChanged(ScanState value) { OnPropertyChanged(nameof(CanFix)); OnPropertyChanged(nameof(CanOpen)); }
     partial void OnFixChanged(FixKind value) { OnPropertyChanged(nameof(CanFix)); OnPropertyChanged(nameof(CanOpen)); }
 }
@@ -161,12 +218,12 @@ public sealed partial class ScanViewModel : ObservableObject
         Phase = ScanPhase.Results;
     }
 
-    private bool CanFixNow() => Phase == ScanPhase.Results && Items.Any(i => i.Selected && i.CanFix);
+    private bool CanFixNow() => Phase == ScanPhase.Results && Items.Any(i => i.Selected && i.CanFix && (!i.HasSelectableChoices || i.SelectedChoices.Any()));
 
     [RelayCommand(CanExecute = nameof(CanFixNow))]
     private async Task FixAsync()
     {
-        var todo = Items.Where(i => i.Selected && i.CanFix).ToList();
+        var todo = Items.Where(i => i.Selected && i.CanFix && (!i.HasSelectableChoices || i.SelectedChoices.Any())).ToList();
         if (todo.Any(i => i.Fix == FixKind.CleanTemp))
         {
             var answer = Controls.ThemedDialog.Show("Junk cleanup permanently deletes temporary files older than 2 days (not via the Recycle Bin). Everything else the scan fixes can be undone in History.\n\nContinue?",
@@ -252,6 +309,7 @@ public sealed partial class ScanViewModel : ObservableObject
         if (hogs.Count > 0)
         {
             i.Payload = hogs;
+            foreach (var h in hogs) { i.Choices.Add(new ScanChoice { Title = $"{h.Name} — {h.CpuPercent:F0}% CPU", Description = "Runs in efficiency mode: lower priority and power-saving cores. Undo in History." }); }
             Issue(i, $"{hogs.Count} app(s)", string.Join(", ", hogs.Select(h => $"{h.Name} {h.CpuPercent:F0}%")) + " — can run in efficiency mode.", FixKind.CalmHogs, true, 2);
         }
         else { Ok(i, "None", "No background app is hogging the CPU."); }
@@ -276,6 +334,7 @@ public sealed partial class ScanViewModel : ObservableObject
         var ins = await client.GetInsightsAsync().ConfigureAwait(true);
         if (ins.Leaks.Length > 0)
         {
+            foreach (var l in ins.Leaks) { i.Choices.Add(new ScanChoice { Title = $"{l.Name} (process {l.Pid}) — {l.PrivateMb:N0} MB, growing {l.GrowthMbPerHour:N0} MB per hour", Description = "Close and reopen it to give the memory back." }); }
             Issue(i, $"{ins.Leaks.Length} app(s)", string.Join(", ", ins.Leaks.Take(3).Select(l => $"{l.Name} +{l.GrowthMbPerHour:F0} MB/h")) + ". Restarting them frees the memory.", FixKind.OpenPage, false);
             i.OpenPage = MainViewModel.PageHealthCheck;
         }
@@ -299,6 +358,7 @@ public sealed partial class ScanViewModel : ObservableObject
     {
         var drives = await Task.Run(DriveHealth.Read).ConfigureAwait(true);
         var bad = drives.Where(d => !d.Verdict.StartsWith("Healthy", StringComparison.Ordinal)).ToList();
+        foreach (var d in drives) { i.Choices.Add(new ScanChoice { Title = $"{d.Name}: {d.Verdict}" }); }
         if (bad.Count > 0)
         {
             Issue(i, $"{bad.Count} need attention", string.Join("; ", bad.Select(d => $"{d.Name}: {d.Verdict}")), FixKind.OpenPage, false, 3);
@@ -311,6 +371,7 @@ public sealed partial class ScanViewModel : ObservableObject
     {
         var apps = await Task.Run(StartupApps.List).ConfigureAwait(true);
         var enabled = apps.Count(a => a.Enabled);
+        foreach (var a in apps.Where(a => a.Enabled)) { i.Choices.Add(new ScanChoice { Title = a.Name }); }
         if (enabled > 6)
         {
             Issue(i, $"{enabled} apps", "Many apps start with Windows and slow down your boot. Review them on the Startup page — you decide which to keep.", FixKind.OpenPage, false);
@@ -329,9 +390,18 @@ public sealed partial class ScanViewModel : ObservableObject
     private async Task CheckSwitchesAsync(ScanItem i)
     {
         var elevated = _main.IsElevatedProcess;
-        var missing = await Task.Run(() => WindowsTweaks.Catalog.Count(t => !WindowsTweaks.IsApplied(t) && (!t.RequiresAdmin || elevated))).ConfigureAwait(true);
-        if (missing > 0) { Issue(i, $"{missing} available", "Recommended Windows settings that aren't on yet (optional, each undoable on the Clean page).", FixKind.QuickSwitches, false); }
-        else { Ok(i, "All applied"); }
+        var missing = await Task.Run(() => WindowsTweaks.ScanSuggestions(elevated)).ConfigureAwait(true);
+        foreach (var t in missing)
+        {
+            i.Choices.Add(new ScanChoice { Title = t.Title, Description = $"{t.Description} Takes effect: {t.TakesEffect}.", Selectable = true, Payload = t });
+        }
+        if (missing.Count > 0)
+        {
+            var names = string.Join(", ", missing.Take(3).Select(t => t.Title)) + (missing.Count > 3 ? $" and {missing.Count - 3} more" : "");
+            Issue(i, $"{missing.Count} available", $"{names}. Optional; tick the ones you want, each can be undone in History or on the Windows page.", FixKind.QuickSwitches, false);
+            i.Expanded = true;
+        }
+        else { Ok(i, "All applied", "Every speed and convenience setting is on. More settings are on the Windows page."); }
     }
 
     // ------------------------------------------------------------------ fixes
@@ -359,7 +429,7 @@ public sealed partial class ScanViewModel : ObservableObject
                 _main.SystemSettings.ApplyFastVisuals();
                 return "Animations off";
             case FixKind.QuickSwitches:
-                return _main.SystemSettings.ApplyRecommendedSwitches();
+                return _main.SystemSettings.ApplySwitches(item.SelectedChoices.Select(c => c.Payload).OfType<WindowsTweak>().ToList());
             default:
                 throw new InvalidOperationException("The engine is not connected.");
         }

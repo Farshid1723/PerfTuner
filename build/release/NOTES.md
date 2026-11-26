@@ -1,3 +1,8 @@
+## What's new in 0.10.2
+
+- **Scan & Fix shows its details.** Every finding has *Show details*: the settings, apps, leaking processes, drives or startup apps behind it. The Windows settings finding lists each setting with what it does and when it takes effect, and only the ones you tick are applied.
+- The scan suggests only speed-and-convenience settings; privacy, look-and-feel and Windows Update settings stay on the Windows page for you to choose. Fast Startup is no longer counted when hibernation is off.
+
 ## What PerfTuner does
 
 A Windows 11 performance, maintenance and security tool that explains every action before you apply it and can undo every change it makes.

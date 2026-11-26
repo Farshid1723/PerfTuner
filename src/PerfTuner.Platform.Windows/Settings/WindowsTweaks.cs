@@ -224,6 +224,23 @@ public static class WindowsTweaks
         }
     }
 
+    /// <summary>The group Scan &amp; Fix suggests from. The other groups (privacy, Windows look and behaviour, Windows Update) are personal choices made on the Windows page.</summary>
+    public const string ScanCategory = "Speed & convenience";
+
+    /// <summary>
+    /// The settings Scan &amp; Fix suggests: speed-and-convenience settings that aren't on yet and can be
+    /// applied with the current rights (Fast Startup only when hibernation is enabled). The scan lists
+    /// these and the fix applies the ones the user ticks, so both always work from the same list.
+    /// </summary>
+    public static IReadOnlyList<WindowsTweak> ScanSuggestions(bool elevated)
+    {
+        var hibernation = HibernationAvailable();
+        return Catalog.Where(t => t.Category == ScanCategory
+                                  && (!t.RequiresAdmin || elevated)
+                                  && (t.Id != "fast-startup" || hibernation)
+                                  && !IsApplied(t)).ToList();
+    }
+
     public static WindowsTweak? Find(string id) => Catalog.FirstOrDefault(t => t.Id == id);
 
     /// <summary>Whether a registry value belongs to a catalog setting (undo records are checked against this).</summary>

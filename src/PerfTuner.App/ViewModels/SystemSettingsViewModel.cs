@@ -446,25 +446,29 @@ public sealed partial class SystemSettingsViewModel : ObservableObject
         return Message;
     }
 
-    internal string ApplyRecommendedSwitches()
+    /// <summary>For Scan &amp; Fix: apply the settings the user ticked, without prompts; returns the result line.</summary>
+    internal string ApplySwitches(IReadOnlyList<WindowsTweak> tweaks)
     {
-        var applied = 0;
-        foreach (var t in WindowsTweaks.Catalog)
+        var applied = new List<string>();
+        var failed = new List<string>();
+        foreach (var t in tweaks)
         {
-            if (WindowsTweaks.IsApplied(t) || (t.RequiresAdmin && !IsElevated) || (t.Id == "fast-startup" && !WindowsTweaks.HibernationAvailable())) { continue; }
+            if (WindowsTweaks.Find(t.Id) is null || WindowsTweaks.IsApplied(t) || (t.RequiresAdmin && !IsElevated)) { continue; }
             try
             {
                 WindowsTweaks.Apply(t, Journal);
-                applied++;
+                applied.Add(t.Title);
             }
             catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException or IOException or ArgumentException)
             {
-                Message = "✖ " + ex.Message;
+                failed.Add($"{t.Title} ({ex.Message})");
             }
         }
         Refresh();
-        _main.Changes.AddLocalHistory($"QuickSwitches: {applied} applied");
-        return $"{applied} Windows switch(es) applied.";
+        if (applied.Count > 0) { _main.Changes.AddLocalHistory("Scan & Fix turned on: " + string.Join(", ", applied)); }
+        if (applied.Count == 0 && failed.Count > 0) { throw new InvalidOperationException("Not changed: " + string.Join("; ", failed)); }
+        var text = applied.Count == 1 ? $"{applied[0]}: on" : $"{applied.Count} settings turned on";
+        return failed.Count == 0 ? text : $"{text}; not changed: {string.Join("; ", failed)}";
     }
 
     private void Run(Func<string> action)
