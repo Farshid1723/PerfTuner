@@ -57,10 +57,14 @@ public sealed partial class SystemSettingsViewModel : ObservableObject
     {
         _main = main;
         Journal = new SettingsJournal();
+        MachineSettings = main.IsElevatedProcess ? SettingsJournal.ForMachine() : null;
         BoostOptions = [.. PowerSettings.BoostModes.Select(b => new BoostOption(b.Value, b.Name))];
     }
 
     public SettingsJournal Journal { get; }
+
+    /// <summary>Administrator-only undo journal for machine-wide changes (null without full power).</summary>
+    public SettingsJournal? MachineSettings { get; }
     public bool IsElevated => _main.IsElevatedProcess;
     public ObservableCollection<PowerPlan> PowerPlans { get; } = [];
     public IReadOnlyList<BoostOption> BoostOptions { get; }

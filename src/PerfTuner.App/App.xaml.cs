@@ -109,6 +109,8 @@ public partial class App : Application
             if (appArg >= 0 && appArg + 1 < e.Args.Length) { _viewModel.AppStore.Preselect(e.Args[appArg + 1]); }
             // --scan starts Scan & Fix right away (with --page 8; shortcuts, screenshots).
             if (page == MainViewModel.PageScan && Array.IndexOf(e.Args, "--scan") >= 0) { _viewModel.Scan.StartScanCommand.Execute(null); }
+            // --preview-undocumented shows the Undocumented page's list without saving the warning's acknowledgement (screenshots).
+            if (Array.IndexOf(e.Args, "--preview-undocumented") >= 0) { _viewModel.Undocumented.Preview(); }
             var partArg = Array.IndexOf(e.Args, "--part");
             if (partArg >= 0 && partArg + 1 < e.Args.Length) { _viewModel.Cockpit.SelectPartCommand.Execute(e.Args[partArg + 1]); }
         }

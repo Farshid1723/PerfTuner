@@ -52,7 +52,8 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public const int PageSecurity = 12;
     public const int PageGetApps = 13;
     public const int PageWindows = 14;
-    public const int LastPage = PageWindows;
+    public const int PageUndocumented = 15;
+    public const int LastPage = PageUndocumented;
 
     // Old names kept for the scan's "open" links.
     public const int PagePulse = PageHome;
@@ -68,6 +69,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         new(PageSpeed, "\uE945", "Speed", "Modes and free RAM"),
         new(PageClean, "\uE74D", "Clean", "Junk files and update leftovers"),
         new(PageWindows, "\uE770", "Windows", "Settings, features, updates, DNS"),
+        new(PageUndocumented, "\uE7BA", "Undocumented", "Hidden settings · risky"),
         new(PageStartup, "\uE7E8", "Startup", "Boot time and startup apps"),
         new(PageApps, "\uE71D", "Apps", "Control any running app"),
         new(PageGetApps, "\uE719", "Get apps", "Install, update, remove apps"),
@@ -116,6 +118,13 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         AppStore = new AppStoreViewModel(this);
         WindowsPage = new WindowsPageViewModel(this);
         Maintenance = new MaintenanceViewModel(this);
+        Undocumented = new UndocumentedViewModel(this);
+        BuiltIns = new BuiltInAppsViewModel(this);
+        Desktops = new Desktop.DesktopHelper();
+        Desktops.Problem += text => Undocumented.Message = text;
+        _modeHotkeys = GuiSettings.Current.ModeHotkeys;
+        ApplyDesktopHelpers();
+        ApplyModeHotkeys();
         _selectedTheme = Themes.ThemeManager.Current;
         _freshnessTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _freshnessTimer.Tick += (_, _) => UpdateFreshness();
@@ -136,6 +145,35 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public AppStoreViewModel AppStore { get; }
     public WindowsPageViewModel WindowsPage { get; }
     public MaintenanceViewModel Maintenance { get; }
+    public UndocumentedViewModel Undocumented { get; }
+    public BuiltInAppsViewModel BuiltIns { get; }
+    public Desktop.DesktopHelper Desktops { get; }
+
+    /// <summary>Settings page: Ctrl+Alt+Shift+F1…F4 switch modes from anywhere.</summary>
+    [ObservableProperty] private bool _modeHotkeys;
+    [ObservableProperty] private string _hotkeyMessage = "";
+
+    partial void OnModeHotkeysChanged(bool value)
+    {
+        GuiSettings.Update(g => g with { ModeHotkeys = value });
+        ApplyModeHotkeys();
+    }
+
+    private void ApplyModeHotkeys()
+    {
+        var failed = Desktops.SetModeHotkeys(ModeHotkeys, mode => _ = SetModeAsync(mode));
+        HotkeyMessage = !ModeHotkeys ? ""
+            : failed.Count == 0 ? "✔ Ctrl+Alt+Shift+F1 Off · F2 Turbo · F3 Smart · F4 Silent"
+            : "Already used by another program: " + string.Join(", ", failed);
+    }
+
+    /// <summary>Applies the saved virtual-desktop helper switches (Undocumented page).</summary>
+    internal void ApplyDesktopHelpers()
+    {
+        var g = GuiSettings.Current;
+        var supported = Platform.Windows.Undocumented.UndocumentedTweaks.Build >= 22000;
+        Desktops.Configure(supported && g.DesktopTray, supported && g.DesktopOverlay, supported && g.DesktopHotkeys);
+    }
     public TroubleshootViewModel Troubleshoot { get; }
 
     public PerfTunerClient? Client => Volatile.Read(ref _client);
@@ -178,6 +216,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
         AppStore.SetActive(value == PageGetApps);
         WindowsPage.SetActive(value == PageWindows);
         Maintenance.SetActive(value == PageClean);
+        Undocumented.SetActive(value == PageUndocumented);
         if (value == PageApps) { _ = Tuning.LoadRulesAsync(); }
         if (value is PageClean or PageWindows) { SystemSettings.Refresh(); }
         if (value == PageSpeed) { SystemSettings.Refresh(); }
@@ -954,6 +993,7 @@ public sealed partial class MainViewModel : ObservableObject, IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _exiting = true;
+        Desktops.Dispose();
         _engineWanted = false;
         _freshnessTimer.Stop();
         await ShutdownEngineAsync().ConfigureAwait(false);

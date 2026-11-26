@@ -955,6 +955,19 @@
                 </UniformGrid>
                 <TextBlock Text="{Binding RepairProgress}" Style="{StaticResource Subtle}" Margin="0,4,0,0" />
                 <TextBlock Text="{Binding RepairMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,2">
+                  <TextBlock Text="Network repair" Style="{StaticResource H3}" />
+                  <c:HelpButton Topic="network-repair" />
+                </StackPanel>
+                <TextBlock Text="When the internet works on other devices but not on this PC. Start at the top; the last two need a restart." Style="{StaticResource Subtle}" Margin="0,0,0,8" TextWrapping="Wrap" />
+                <WrapPanel>
+                  <Button Style="{StaticResource SecondaryButton}" Content="Clear DNS cache" Command="{Binding FlushDnsCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Renew IP address" Command="{Binding RenewAddressCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Reset Winsock" Command="{Binding ResetWinsockCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Reset TCP/IP" Command="{Binding ResetTcpIpCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Windows' network reset…" Command="{Binding OpenPanelCommand}" CommandParameter="network-reset" Margin="0,0,8,8" />
+                </WrapPanel>
+                <TextBlock Text="{Binding NetworkMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
                 <TextBlock Text="Classic Windows panels" Style="{StaticResource H3}" Margin="0,16,0,8" />
                 <WrapPanel>
                   <Button Style="{StaticResource SecondaryButton}" Content="Control Panel" Command="{Binding OpenPanelCommand}" CommandParameter="control" Margin="0,0,8,8" />
@@ -1237,8 +1250,11 @@
                           Content="Show a notification when PerfTuner does something on its own" />
                 <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CloseToTray}" Margin="0,0,0,12"
                           Content="Keep running in the tray when I close the window" />
-                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoFixOn}"
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoFixOn}" Margin="0,0,0,12"
                           Content="Automatic fixes — test and keep fixes for slowdowns on its own" />
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding ModeHotkeys}"
+                          Content="Keyboard shortcuts for the modes: Ctrl+Alt+Shift+F1 Off, F2 Turbo, F3 Smart, F4 Silent" />
+                <TextBlock Text="{Binding HotkeyMessage}" Style="{StaticResource Message}" />
                 <TextBlock Text="{Binding OperationMessage}" Style="{StaticResource Message}" />
               </StackPanel>
             </Border>
@@ -2414,6 +2430,39 @@
               <TextBlock Text="{Binding Progress}" Style="{StaticResource Subtle}" VerticalAlignment="Center" />
             </DockPanel>
             <ProgressBar IsIndeterminate="True" Height="3" Margin="0,4,0,0" Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+            <Expander Header="Built-in Windows apps and Microsoft Store repair" Margin="0,6,0,0" Foreground="{DynamicResource TextBrush}"
+                      DataContext="{Binding DataContext.BuiltIns, RelativeSource={RelativeSource AncestorType=Window}}" IsExpanded="{Binding Open}">
+              <StackPanel Margin="0,8,0,4">
+                <WrapPanel>
+                  <Button Style="{StaticResource SecondaryButton}" Content="Clear Store cache" Command="{Binding ResetStoreCacheCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Re-register Microsoft Store" Command="{Binding ReregisterStoreCommand}" Margin="0,0,8,8" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="Re-register all my apps" Command="{Binding ReregisterAllCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,6">
+                  <TextBlock Text="Built-in apps installed for you. Tick the ones you don't use and remove them; they can be reinstalled from Microsoft Store." Style="{StaticResource Subtle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                  <c:HelpButton Topic="built-in-apps" />
+                </StackPanel>
+                <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding Apps}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <CheckBox IsChecked="{Binding Selected}" Width="250" Margin="0,0,8,6" ToolTip="{Binding Note}">
+                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                        </CheckBox>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+                <DockPanel Margin="0,6,0,0">
+                  <Button DockPanel.Dock="Left" Style="{StaticResource SecondaryButton}" Content="Remove selected" Command="{Binding RemoveSelectedCommand}" />
+                  <TextBlock Text="{Binding Progress}" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                </DockPanel>
+                <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Expander>
             <Expander Header="Activity log" IsExpanded="{Binding LogOpen}" Margin="0,6,0,0" Foreground="{DynamicResource TextBrush}">
               <ListBox ItemsSource="{Binding Log}" Height="150" FontFamily="Consolas" FontSize="11.5" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SubtleBrush}" />
             </Expander>
@@ -2528,6 +2577,17 @@
                 </ItemsControl>
                 <TextBlock Text="{Binding FeatureProgress}" Style="{StaticResource Subtle}" />
                 <TextBlock Text="{Binding FeatureMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                <Border Style="{StaticResource Panel}" Margin="0,8,0,0">
+                  <DockPanel>
+                    <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" Margin="16,0,0,0"
+                              IsChecked="{Binding SearchIndexOn, Mode=OneWay}" IsEnabled="{Binding SearchKnown}" Command="{Binding ToggleSearchIndexCommand}" />
+                    <StackPanel>
+                      <TextBlock Text="Search indexing" Style="{StaticResource H3}" />
+                      <TextBlock Text="The Windows Search service keeps an index so Start, File Explorer and Outlook find things instantly. Turning it off saves a little disk and CPU work on slow PCs; search then becomes slow and can't look inside files." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                      <TextBlock Text="{Binding SearchMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
               </StackPanel>
             </Border>
 
@@ -2547,6 +2607,129 @@
                 </StackPanel>
                 <TextBlock Text="{Binding SelectedDns.Description}" Style="{StaticResource Subtle}" Margin="0,6,0,0" />
                 <TextBlock Text="{Binding DnsMessage}" Style="{StaticResource Message}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <!-- ============================== 15 Undocumented ============================== -->
+      <TabItem>
+        <ScrollViewer Style="{StaticResource PageScroll}" DataContext="{Binding Undocumented}">
+          <ScrollViewer.Resources>
+            <CollectionViewSource x:Key="UndocGroups" Source="{Binding Rows}">
+              <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Group" />
+              </CollectionViewSource.GroupDescriptions>
+            </CollectionViewSource>
+          </ScrollViewer.Resources>
+          <StackPanel>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Undocumented" Style="{StaticResource PageTitle}" />
+              <c:HelpButton Topic="undocumented" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="Settings Windows reads but Microsoft never documented, plus a few documented ones that are widely misused. Each one says honestly what it does. Might be dangerous." Style="{StaticResource PageSubtitle}" TextWrapping="Wrap" />
+
+            <Border Style="{StaticResource Card}" Background="{DynamicResource BadSoftBrush}" BorderBrush="{DynamicResource BadBrush}" BorderThickness="1">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Left" FontFamily="{StaticResource IconFont}" Text="&#xE7BA;" FontSize="28" Foreground="{DynamicResource BadBrush}" VerticalAlignment="Top" Margin="0,2,16,0" />
+                <StackPanel>
+                  <TextBlock Text="Use with care" Style="{StaticResource H2}" />
+                  <TextBlock Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,4,0,0"
+                             Text="Microsoft doesn't support these settings and can change or remove them in any update. Some do nothing, some make Windows slower or less safe; the label on each one tells you which. PerfTuner asks before every change (risky ones twice), records what was there before, and lets you switch it back here or in History, except the one-off actions." />
+                  <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <StackPanel.Style>
+                      <Style TargetType="StackPanel">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Accepted}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </StackPanel.Style>
+                    <Button Style="{StaticResource PrimaryButton}" Content="I understand, show the settings" Command="{Binding AcceptCommand}" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding BuildText}" Style="{StaticResource Subtle}" FontSize="11.5" Opacity="0.8" Margin="0,8,0,0"
+                             Visibility="{Binding Accepted, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+              </DockPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Visibility="{Binding Accepted, Converter={StaticResource BoolToVis}}">
+              <StackPanel>
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Refresh" Command="{Binding RefreshCommand}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Message}" Style="{StaticResource Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding Source={StaticResource UndocGroups}}">
+                  <ItemsControl.GroupStyle>
+                    <GroupStyle>
+                      <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding Name}" Style="{StaticResource H3}" Foreground="{DynamicResource AccentBrush}" Margin="0,14,0,8" />
+                        </DataTemplate>
+                      </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                  </ItemsControl.GroupStyle>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border Margin="0,0,0,8">
+                        <Border.Style>
+                          <Style TargetType="Border" BasedOn="{StaticResource Panel}">
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding Available}" Value="False"><Setter Property="Opacity" Value="0.55" /></DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Border.Style>
+                        <DockPanel>
+                          <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" Margin="16,0,0,0"
+                                    IsChecked="{Binding Applied, Mode=OneWay}" IsEnabled="{Binding CanChange}"
+                                    Visibility="{Binding IsToggle, Converter={StaticResource BoolToVis}}"
+                                    Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}" />
+                          <Button DockPanel.Dock="Right" Style="{StaticResource SecondaryButton}" Content="Run" VerticalAlignment="Center" Margin="16,0,0,0"
+                                  Visibility="{Binding IsAction, Converter={StaticResource BoolToVis}}" IsEnabled="{Binding Available}"
+                                  Command="{Binding DataContext.RunActionCommand, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" CommandParameter="{Binding}" />
+                          <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                              <TextBlock Text="{Binding Title}" Style="{StaticResource H3}" VerticalAlignment="Center" />
+                              <Border Margin="10,0,0,0" CornerRadius="{DynamicResource PillRadius}" Padding="8,1" VerticalAlignment="Center">
+                                <Border.Style>
+                                  <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+                                    <Style.Triggers>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="Works"><Setter Property="Background" Value="{DynamicResource GoodSoftBrush}" /></DataTrigger>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="Niche"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" /></DataTrigger>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="Placebo"><Setter Property="Background" Value="{DynamicResource WarnSoftBrush}" /></DataTrigger>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="Dead"><Setter Property="Background" Value="{DynamicResource WarnSoftBrush}" /></DataTrigger>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="Risky"><Setter Property="Background" Value="{DynamicResource BadSoftBrush}" /></DataTrigger>
+                                      <DataTrigger Binding="{Binding Verdict}" Value="SecurityRisk"><Setter Property="Background" Value="{DynamicResource BadSoftBrush}" /></DataTrigger>
+                                    </Style.Triggers>
+                                  </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding VerdictText}" FontSize="11.5" FontWeight="SemiBold">
+                                  <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                      <Setter Property="Foreground" Value="{DynamicResource SubtleBrush}" />
+                                      <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="Works"><Setter Property="Foreground" Value="{DynamicResource GoodBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="Niche"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="Placebo"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="Dead"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="Risky"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                                        <DataTrigger Binding="{Binding Verdict}" Value="SecurityRisk"><Setter Property="Foreground" Value="{DynamicResource BadBrush}" /></DataTrigger>
+                                      </Style.Triggers>
+                                    </Style>
+                                  </TextBlock.Style>
+                                </TextBlock>
+                              </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Description}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                            <TextBlock Text="{Binding VerdictNote}" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,3,0,0" FontStyle="Italic"
+                                       Visibility="{Binding HasVerdictNote, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="{Binding Meta}" Style="{StaticResource Subtle}" FontSize="11.5" Margin="0,4,0,0" Opacity="0.8" />
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
               </StackPanel>
             </Border>
           </StackPanel>

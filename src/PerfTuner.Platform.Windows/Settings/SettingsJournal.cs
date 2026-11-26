@@ -12,6 +12,14 @@ public enum SettingKind
     StartupApp,
     RegistryValue,
     MouseParameters,
+    /// <summary>A registry key that was removed (undo recreates it).</summary>
+    RegistryKeyRemoved,
+    /// <summary>A boot setting of the running Windows (undo restores or removes it).</summary>
+    BootSetting,
+    /// <summary>A Windows service's start type (undo restores it).</summary>
+    ServiceStartType,
+    /// <summary>A folder PerfTuner created (undo removes it).</summary>
+    FolderCreated,
 }
 
 /// <summary>One persistent settings change and the value it replaced.</summary>
@@ -36,6 +44,16 @@ public sealed record SettingChange
     public string? RegOriginal { get; set; }          // null = value did not exist
     public string? RegOriginalKind { get; set; }
     public int[]? IntValues { get; set; }             // MouseParameters originals
+
+    /// <summary>The catalog item this change belongs to (Undocumented page), so switching it off finds its entries.</summary>
+    public string? Tag { get; set; }
+    public string? RegCreatedRoot { get; set; }       // RegistryValue: topmost key PerfTuner created (undo removes the chain while empty)
+    public string? BootElement { get; set; }          // BootSetting
+    public string? BootOriginal { get; set; }         // null = element was not set
+    public string? ServiceName { get; set; }          // ServiceStartType
+    public int ServiceStart { get; set; }
+    public bool ServiceDelayed { get; set; }
+    public string? FolderPath { get; set; }           // FolderCreated
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
@@ -53,14 +71,31 @@ public sealed class SettingsJournal
 {
     private const int MaxEntries = 200;
     private readonly string _path;
+    private readonly bool _machine;
     private readonly Lock _gate = new();
     private List<SettingChange> _entries;
 
-    public SettingsJournal(string? path = null)
+    public SettingsJournal(string? path = null) : this(path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PerfTuner", "settings-journal.json"), machine: false)
     {
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PerfTuner", "settings-journal.json");
-        _entries = Load(_path);
     }
+
+    private SettingsJournal(string path, bool machine)
+    {
+        _path = path;
+        _machine = machine;
+        _entries = Load(_path, machine);
+    }
+
+    /// <summary>
+    /// The administrator-only journal for machine-wide changes of the Undocumented page, boot settings and service
+    /// start types: %ProgramData%\PerfTuner-Undo\settings-journal.json, hardened like the page-file journal and
+    /// ignored unless owned by Administrators or SYSTEM, so a standard user can't plant an undo target there.
+    /// Undo records for those kinds are only honoured from this journal.
+    /// </summary>
+    public static SettingsJournal ForMachine(string? path = null) =>
+        new(path ?? Path.Combine(Path.GetDirectoryName(MachineJournal.DefaultPath)!, "settings-journal.json"), machine: true);
+
+    public bool IsMachine => _machine;
 
     public IReadOnlyList<SettingChange> Entries
     {
@@ -92,7 +127,7 @@ public sealed class SettingsJournal
             entry = _entries.FirstOrDefault(e => e.Id == id);
             if (entry is null) { return "Change not found."; }
         }
-        Undo(entry);
+        Undo(entry, _machine);
         lock (_gate)
         {
             _entries.Remove(entry);
@@ -109,7 +144,7 @@ public sealed class SettingsJournal
         {
             try
             {
-                Undo(entry);
+                Undo(entry, _machine);
                 ok++;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException or ArgumentException)
@@ -125,7 +160,10 @@ public sealed class SettingsJournal
         return (ok, failed);
     }
 
-    private static void Undo(SettingChange e)
+    private const string NotOurs = "This undo record doesn't match anything PerfTuner changes, so it was not applied.";
+
+    /// <param name="trusted">The entry comes from the administrator-only journal.</param>
+    private static void Undo(SettingChange e, bool trusted)
     {
         switch (e.Kind)
         {
@@ -146,11 +184,33 @@ public sealed class SettingsJournal
                 break;
             case SettingKind.RegistryValue when e.RegPath is not null && e.RegName is not null:
                 // The journal sits in the user profile: only values PerfTuner itself writes may be put back.
-                if (!WindowsTweaks.MayRestore(e.RegMachine, e.RegPath, e.RegName) && !Security.SecurityChecks.MayRestore(e.RegMachine, e.RegPath, e.RegName, e.RegOriginal))
+                // Machine-wide undocumented values only from the administrator-only journal.
+                if (!WindowsTweaks.MayRestore(e.RegMachine, e.RegPath, e.RegName) && !Security.SecurityChecks.MayRestore(e.RegMachine, e.RegPath, e.RegName, e.RegOriginal)
+                    && !(Core.Undocumented.UndocumentedCatalog.MayRestoreValue(e.RegMachine, e.RegPath, e.RegName) && (trusted || !e.RegMachine)))
                 {
-                    throw new InvalidOperationException("This undo record doesn't match anything PerfTuner changes, so it was not applied.");
+                    throw new InvalidOperationException(NotOurs);
                 }
                 RegistryWriter.Restore(e);
+                if (e.RegCreatedRoot is { } root && (trusted || !e.RegMachine) && Core.Undocumented.UndocumentedCatalog.MayRestoreKey(e.RegMachine, e.RegPath)
+                    && Core.Undocumented.UndocumentedCatalog.IsCreatedRoot(e.RegPath, root))
+                {
+                    Undocumented.UndocumentedTweaks.RemoveCreatedKeys(e.RegMachine, e.RegPath, root);
+                }
+                break;
+            case SettingKind.RegistryKeyRemoved when e.RegPath is not null:
+                if (!(trusted || !e.RegMachine) || !Core.Undocumented.UndocumentedCatalog.MayRestoreKey(e.RegMachine, e.RegPath)) { throw new InvalidOperationException(NotOurs); }
+                Undocumented.UndocumentedTweaks.RecreateKey(e.RegMachine, e.RegPath);
+                break;
+            case SettingKind.BootSetting when e.BootElement is not null:
+                if (!trusted || !Core.Undocumented.UndocumentedCatalog.MayRestoreBoot(e.BootElement, e.BootOriginal)) { throw new InvalidOperationException(NotOurs); }
+                Undocumented.BootSettings.Restore(e.BootElement, e.BootOriginal);
+                break;
+            case SettingKind.ServiceStartType when e.ServiceName is not null:
+                if (!trusted || !Core.Undocumented.UndocumentedCatalog.MayRestoreService(e.ServiceName, e.ServiceStart)) { throw new InvalidOperationException(NotOurs); }
+                Undocumented.ServiceStart.Set(e.ServiceName, e.ServiceStart, e.ServiceDelayed);
+                break;
+            case SettingKind.FolderCreated when e.FolderPath is not null:
+                Undocumented.UndocumentedTweaks.RemoveAllSettingsFolder(e.FolderPath);
                 break;
             case SettingKind.MouseParameters when e.IntValues is { Length: 3 } mouse:
                 WindowsTweaks.SetMouseParams(mouse);
@@ -162,18 +222,20 @@ public sealed class SettingsJournal
 
     private void Save()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        if (_machine) { DirectoryHardening.CreateHardened(Path.GetDirectoryName(_path)!); }
+        else { Directory.CreateDirectory(Path.GetDirectoryName(_path)!); }
         var tmp = _path + ".tmp";
         File.WriteAllText(tmp, JsonSerializer.Serialize(_entries, SettingsJournalJsonContext.Default.ListSettingChange));
         File.Move(tmp, _path, overwrite: true);
     }
 
-    private static List<SettingChange> Load(string path)
+    private static List<SettingChange> Load(string path, bool machine)
     {
         try
         {
             var info = new FileInfo(path);
             if (!info.Exists || info.Length > 1024 * 1024) { return []; }
+            if (machine && !MachineJournal.IsTrusted(path)) { return []; }
             return JsonSerializer.Deserialize(File.ReadAllText(path), SettingsJournalJsonContext.Default.ListSettingChange) ?? [];
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)

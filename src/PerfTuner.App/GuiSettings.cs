@@ -23,6 +23,17 @@ public sealed record GuiPreferences
 
     /// <summary>Space explorer view: tree, treemap or sunburst.</summary>
     public string SpaceMode { get; init; } = "tree";
+
+    /// <summary>Ctrl+Alt+Shift+F1…F4 switch modes from anywhere.</summary>
+    public bool ModeHotkeys { get; init; }
+
+    /// <summary>The user confirmed the warning on the Undocumented page.</summary>
+    public bool UndocumentedAccepted { get; init; }
+
+    /// <summary>Undocumented page: virtual-desktop helpers.</summary>
+    public bool DesktopTray { get; init; }
+    public bool DesktopOverlay { get; init; }
+    public bool DesktopHotkeys { get; init; }
 }
 
 [JsonSerializable(typeof(GuiPreferences))]

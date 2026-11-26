@@ -129,6 +129,8 @@ public sealed class MachineJournal
             if (_entries.Count > 0) { return; }
         }
         var dir = Path.GetDirectoryName(_path)!;
+        // The administrator-only settings journal shares the folder: keep it while it still has something to undo.
+        if (SettingsJournal.ForMachine(Path.Combine(dir, "settings-journal.json")).Entries.Count > 0) { return; }
         try
         {
             if (Directory.Exists(dir) && !new DirectoryInfo(dir).Attributes.HasFlag(FileAttributes.ReparsePoint)) { Directory.Delete(dir, recursive: true); }
@@ -151,7 +153,7 @@ public sealed class MachineJournal
     {
         try
         {
-            if (!File.Exists(path) || new FileInfo(path).Length > 1_000_000 || !TrustedOwner(path)) { return []; }
+            if (!File.Exists(path) || new FileInfo(path).Length > 1_000_000 || !IsTrusted(path)) { return []; }
             return JsonSerializer.Deserialize(File.ReadAllText(path), MachineJournalJsonContext.Default.ListMachineChange) ?? [];
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -161,7 +163,7 @@ public sealed class MachineJournal
     }
 
     /// <summary>Only trust a journal (and its folder) owned by Administrators or SYSTEM and not reached through a junction.</summary>
-    private static bool TrustedOwner(string path)
+    internal static bool IsTrusted(string path)
     {
         var dir = new DirectoryInfo(Path.GetDirectoryName(path)!);
         if (dir.Attributes.HasFlag(FileAttributes.ReparsePoint) || new FileInfo(path).Attributes.HasFlag(FileAttributes.ReparsePoint)) { return false; }

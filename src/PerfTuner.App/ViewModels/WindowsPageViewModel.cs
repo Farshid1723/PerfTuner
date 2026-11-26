@@ -7,6 +7,9 @@ using PerfTuner.App.Controls;
 using PerfTuner.Core.Network;
 using PerfTuner.Platform.Windows.Maintenance;
 using PerfTuner.Platform.Windows.Network;
+using PerfTuner.Platform.Windows.Settings;
+using PerfTuner.Platform.Windows.Undocumented;
+using PerfTuner.Core.Undocumented;
 
 namespace PerfTuner.App.ViewModels;
 
@@ -45,6 +48,11 @@ public sealed partial class WindowsPageViewModel(MainViewModel main) : Observabl
     [ObservableProperty] private string _dnsNow = "";
     [ObservableProperty] private string _dnsMessage = "";
     [ObservableProperty] private bool _canRestoreDns;
+    [ObservableProperty] private bool _searchIndexOn;
+    [ObservableProperty] private bool _searchKnown;
+    [ObservableProperty] private string _searchMessage = "";
+
+    private const string SearchTag = "search-indexing";
 
     public void SetActive(bool active)
     {
@@ -70,6 +78,61 @@ public sealed partial class WindowsPageViewModel(MainViewModel main) : Observabl
             }
         }
         await RefreshDnsAsync().ConfigureAwait(true);
+        await RefreshSearchAsync().ConfigureAwait(true);
+    }
+
+    private async Task RefreshSearchAsync()
+    {
+        var state = await Task.Run(() => ServiceStart.Get(DocumentedServices.Search)).ConfigureAwait(true);
+        SearchKnown = state is not null;
+        // Flip twice so a switch the user clicked shows the real state again.
+        SearchIndexOn = !(state is { StartType: not 4 });
+        SearchIndexOn = state is { StartType: not 4 };
+        if (state is null) { SearchMessage = "Windows Search isn't installed on this PC."; }
+    }
+
+    /// <summary>Windows Search indexing on/off (the WSearch service's start type, journaled so History can undo it).</summary>
+    [RelayCommand]
+    private async Task ToggleSearchIndexAsync()
+    {
+        if (Busy || !SearchKnown) { await RefreshSearchAsync().ConfigureAwait(true); return; }
+        if (!main.IsElevatedProcess) { SearchMessage = "Changing search indexing needs full power (administrator)."; await RefreshSearchAsync().ConfigureAwait(true); return; }
+        var turnOff = SearchIndexOn;
+        if (turnOff && ThemedDialog.Show("Turn off search indexing?\n\nThe Windows Search service stops and won't start again. Searching in Start, File Explorer and Outlook still works but is much slower, and searching inside files stops. Saves a little disk and CPU work on slow PCs.\n\nYou can turn it back on here or undo it in History.",
+                "Search indexing", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            await RefreshSearchAsync().ConfigureAwait(true);
+            return;
+        }
+        Busy = true;
+        try
+        {
+            var journal = main.SystemSettings.MachineSettings ?? throw new InvalidOperationException("This needs full power (administrator).");
+            SearchMessage = await Task.Run(() =>
+            {
+                var name = DocumentedServices.Search;
+                if (turnOff)
+                {
+                    var st = ServiceStart.Get(name) ?? throw new InvalidOperationException("Windows Search isn't installed.");
+                    ServiceStart.Set(name, 4, false);
+                    journal.Record(new SettingChange { Kind = SettingKind.ServiceStartType, Tag = SearchTag, ServiceName = name, ServiceStart = st.StartType, ServiceDelayed = st.Delayed, Description = "Search indexing off" });
+                    ServiceStart.Stop(name);
+                    return "✔ Search indexing is off.";
+                }
+                var ids = journal.Entries.Where(e => e.Tag == SearchTag).Select(e => e.Id).Reverse().ToList();
+                foreach (var id in ids) { journal.Revert(id); }
+                if (ids.Count == 0) { ServiceStart.Set(name, 2, true); }
+                ServiceStart.Start(name);
+                return "✔ Search indexing is on again. Windows rebuilds the index in the background.";
+            }).ConfigureAwait(true);
+            main.AddActivity("You", SearchMessage);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or IOException)
+        {
+            SearchMessage = "✖ " + ex.Message;
+        }
+        finally { Busy = false; }
+        await RefreshSearchAsync().ConfigureAwait(true);
     }
 
     [RelayCommand]

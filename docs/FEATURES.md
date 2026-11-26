@@ -139,6 +139,20 @@ See **[FORENSICS.md](FORENSICS.md)** for the algorithms, bounds and verification
 | More settings (location, background apps, promoted apps, Start recommendations, dark mode, taskbar, Explorer, scrollbars, Num Lock, crash details, sign-in blur, Game Mode) | documented registry values and policies | user or admin | switch off / History |
 | DNS provider | WMI `SetDNSServerSearchOrder` | admin | "Restore previous" (saved per adapter) |
 
+## Undocumented page, repairs and shortcuts (v0.11)
+
+| Feature | How | Rights | Undo |
+|---|---|---|---|
+| Undocumented settings (~50 in 10 groups, each with a verdict: works, niche, placebo, no effect, risky, security risk, setup only) | fixed registry values and keys, `bcdedit` for five boot elements, service start types, one desktop folder | user or admin | switch off / History (machine-wide changes in an admin-only journal) |
+| Empty Prefetch, clear all event logs | file delete in `%WINDIR%\Prefetch`; `EvtClearLog` for every channel | admin | not undoable |
+| Virtual desktops: number in the tray, name overlay, Ctrl+Win+Alt+1…9 / 0 | Explorer's desktop list in `HKCU` + `RegNotifyChangeKeyValue`; Windows' Win+Ctrl+←/→ via `SendInput` | user | switch off |
+| Mode shortcuts Ctrl+Alt+Shift+F1…F4 | `RegisterHotKey` | user | switch off |
+| Network repair: DNS cache, renew IP, Winsock, TCP/IP | WMI `MSFT_DNSClientCache`, `Win32_NetworkAdapterConfiguration`; `netsh` (fixed arguments) | admin | – (repairs) |
+| Remove built-in apps (fixed list) | PackageManager `RemovePackageAsync` (current user) | user | reinstall from Microsoft Store |
+| Store repair, re-register apps | `WSReset.exe`; PackageManager `RegisterPackageAsync` | user | – |
+| Search indexing on/off | `WSearch` start type (`ChangeServiceConfig`) | admin | switch on / History |
+| Filter Keys and Toggle Keys pop-ups, system beep, notification centre, faster service shutdown, error reporting | documented registry values and policies | user or admin | switch off / History |
+
 ## Deliberately not included
 
-Registry "tweak packs", disabling Windows services, network-stack or TCP registry changes, standby-list purging and timer-resolution hacks. They're undocumented, system-wide or hard to reverse, and they conflict with the project's safety rules.
+Hidden Windows feature ids (free-form numbers through an undocumented API), standby-list purging and anything that needs a driver. Everything that is undocumented lives only on the opt-in Undocumented page, labelled with what it really does.

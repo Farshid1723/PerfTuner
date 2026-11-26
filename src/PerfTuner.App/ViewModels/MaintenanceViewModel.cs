@@ -271,6 +271,44 @@ public sealed partial class MaintenanceViewModel(MainViewModel main) : Observabl
         finally { Busy = false; }
     }
 
+    // ------------------------------------------------------------------ network repair (Troubleshoot page)
+
+    [ObservableProperty] private string _networkMessage = "";
+
+    [RelayCommand]
+    private Task FlushDnsAsync() => NetworkAsync("Clear the DNS cache?\n\nWindows forgets the web addresses it looked up and asks again. Helps when a site moved or won't load on this PC only. Nothing else changes.",
+        "Clear DNS cache", () => { Platform.Windows.Network.NetworkRepair.FlushDns(); return "✔ DNS cache cleared."; });
+
+    [RelayCommand]
+    private Task RenewAddressAsync() => NetworkAsync("Get a new IP address from your router?\n\nEvery network connection drops for a few seconds while Windows releases and renews its address. Connections with a fixed (static) address aren't affected.",
+        "Renew IP address", () => Platform.Windows.Network.NetworkRepair.RenewAddresses() ? "✔ New IP addresses received." : "✔ Done; Windows wants a restart to finish.");
+
+    [RelayCommand]
+    private Task ResetWinsockAsync() => NetworkAsync("Reset Winsock?\n\nRestores Windows' network socket catalog to its default (Windows' own \"netsh winsock reset\"). Fixes \"no internet\" after a VPN, proxy or security program left it broken. Some VPN or firewall programs may need reinstalling afterwards.\n\nNeeds a restart.",
+        "Reset Winsock", () => { Platform.Windows.Network.NetworkRepair.ResetWinsock(); return "✔ Winsock reset. Restart the PC to finish."; });
+
+    [RelayCommand]
+    private Task ResetTcpIpAsync() => NetworkAsync("Reset TCP/IP?\n\nRewrites Windows' TCP/IP settings to their defaults (Windows' own \"netsh int ip reset\"). Fixed (static) IP addresses and DNS servers set by hand are removed.\n\nNeeds a restart.",
+        "Reset TCP/IP", () => { Platform.Windows.Network.NetworkRepair.ResetTcpIp(); return "✔ TCP/IP reset. Restart the PC to finish."; });
+
+    private async Task NetworkAsync(string question, string title, Func<string> action)
+    {
+        if (Busy || NeedAdmin(m => NetworkMessage = m)) { return; }
+        if (ThemedDialog.Show(question, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) { return; }
+        Busy = true;
+        try
+        {
+            NetworkMessage = title + "…";
+            NetworkMessage = await Task.Run(action).ConfigureAwait(true);
+            main.AddActivity("You", NetworkMessage);
+        }
+        catch (Exception ex) when (ex is System.Management.ManagementException or InvalidOperationException or TimeoutException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException)
+        {
+            NetworkMessage = $"✖ {title}: {ex.Message}";
+        }
+        finally { Busy = false; }
+    }
+
     [RelayCommand]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "RelayCommand needs an instance method.")]
     private void OpenPanel(string? id)
@@ -296,6 +334,7 @@ public sealed partial class MaintenanceViewModel(MainViewModel main) : Observabl
             "maintenance" => Path.Combine(Environment.SystemDirectory, "wscui.cpl"),
             "sysprops" => Path.Combine(Environment.SystemDirectory, "sysdm.cpl"),
             "restore" => Path.Combine(Environment.SystemDirectory, "rstrui.exe"),
+            "network-reset" => "ms-settings:network-advancedsettings",
             _ => null,
         };
         if (uri is null) { return; }

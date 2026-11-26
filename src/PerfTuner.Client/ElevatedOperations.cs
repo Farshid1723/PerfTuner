@@ -95,6 +95,8 @@ public static class ElevatedOperations
         {
             var (reverted, failed) = new PerfTuner.Platform.Windows.Settings.SettingsJournal().RevertAll();
             log($"Settings restored: {reverted} reverted, {failed} failed");
+            var (adminOk, adminFailed) = PerfTuner.Platform.Windows.Settings.SettingsJournal.ForMachine().RevertAll();
+            log($"Machine-wide settings restored: {adminOk} reverted, {adminFailed} failed");
             var machine = new PerfTuner.Platform.Windows.Settings.MachineJournal();
             var (machineOk, machineFailed, machineSkipped) = machine.RevertAll();
             log($"Machine settings (page file) restored: {machineOk} reverted, {machineFailed} failed, {machineSkipped} skipped (changed by someone else since)");

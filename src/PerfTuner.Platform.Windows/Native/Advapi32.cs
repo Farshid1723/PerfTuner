@@ -77,6 +77,13 @@ internal static unsafe partial class Advapi32
         nint service, uint serviceType, uint startType, uint errorControl, string binaryPath,
         string? loadOrderGroup, nint tagId, string? dependencies, string? account, string? password, string? displayName);
 
+    /// <summary>ChangeServiceConfigW with every string optional (null = unchanged); used to change only the start type.</summary>
+    [LibraryImport("advapi32.dll", EntryPoint = "ChangeServiceConfigW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ChangeServiceStartType(
+        nint service, uint serviceType, uint startType, uint errorControl, string? binaryPath,
+        string? loadOrderGroup, nint tagId, string? dependencies, string? account, string? password, string? displayName);
+
     [LibraryImport("advapi32.dll", EntryPoint = "ChangeServiceConfig2W", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool ChangeServiceConfig2(nint service, uint infoLevel, void* info);

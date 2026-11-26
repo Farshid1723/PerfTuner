@@ -31,7 +31,7 @@ public sealed record FileOpItem(Space.FileOpEntry Entry)
     };
 }
 
-public sealed record SettingItem(SettingChange? Change, MachineChange? Machine = null)
+public sealed record SettingItem(SettingChange? Change, MachineChange? Machine = null, bool AdminJournal = false)
 {
     public string Description => Machine is { } m
         ? m.Description + " (whole PC · after restart)" + (m.UndoNote is { } note ? $" · {note}; undo lets Windows manage the page file" : "")
@@ -112,6 +112,10 @@ public sealed partial class ChangesViewModel : ObservableObject
         {
             SettingChanges.Add(new SettingItem(null, m));
         }
+        foreach (var s in _main.SystemSettings.MachineSettings?.Entries.Reverse() ?? [])
+        {
+            SettingChanges.Add(new SettingItem(s, null, AdminJournal: true));
+        }
 
         HistoryEntry[] serviceHistory = [];
         if (_main.Client is { } client)
@@ -169,9 +173,18 @@ public sealed partial class ChangesViewModel : ObservableObject
                 }
                 Message = new MachineJournal().Revert(machine.Id);
             }
-            else if (item.Change is { } change)
+            else if (item.Change is { } change && item.AdminJournal)
             {
-                Message = _main.SystemSettings.Journal.Revert(change.Id);
+                if (_main.SystemSettings.MachineSettings is not { } admin)
+                {
+                    Message = "Undoing this change needs full power (administrator).";
+                    return;
+                }
+                Message = admin.Revert(change.Id);
+            }
+            else if (item.Change is { } change2)
+            {
+                Message = _main.SystemSettings.Journal.Revert(change2.Id);
             }
             AddLocalHistory(Message);
         }
@@ -187,7 +200,7 @@ public sealed partial class ChangesViewModel : ObservableObject
     private async Task RevertEverythingAsync()
     {
         var answer = Controls.ThemedDialog.Show(
-            "Undo every change made by Performance Tuner?\n\n• live process tuning (priorities, efficiency mode, cores, memory)\n• power plan and processor settings\n• visual effects, transparency and startup apps\n• page-file changes (take effect after a restart)\n\n(Ended processes and deleted temp files cannot be restored. Files you moved or deleted in the Space explorer are not touched.)",
+            "Undo every change made by Performance Tuner?\n\n• live process tuning (priorities, efficiency mode, cores, memory)\n• power plan and processor settings\n• Windows settings, visual effects, transparency and startup apps\n• Undocumented-page settings, boot settings and services (needs full power)\n• page-file changes (take effect after a restart)\n\n(Ended processes and deleted temp files cannot be restored. Files you moved or deleted in the Space explorer are not touched.)",
             "Revert everything", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) { return; }
 
@@ -199,6 +212,12 @@ public sealed partial class ChangesViewModel : ObservableObject
         try
         {
             var (ok, failed) = _main.SystemSettings.Journal.RevertAll();
+            if (_main.SystemSettings.MachineSettings is { } admin)
+            {
+                var (aok, afailed) = admin.RevertAll();
+                ok += aok;
+                failed += afailed;
+            }
             parts.Add($"Settings: {ok} reverted, {failed} failed.");
             if (_main.IsElevatedProcess && new MachineJournal().Entries.Count > 0)
             {

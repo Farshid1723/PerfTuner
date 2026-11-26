@@ -1,3 +1,12 @@
+## What's new in 0.11
+
+- **Undocumented page (opt-in, might be dangerous).** About 50 hidden Windows settings, each labelled with what it really does: works, niche, placebo, no effect, risky, security risk or setup only. Classic right-click menu, classic Alt+Tab, no startup delay, hidden power options, timer and boot settings, network and gaming tweaks, the well-known myths, and the risky ones. PerfTuner asks before every change (risky ones twice) and can undo them all; machine-wide undo records are kept where only administrators can write.
+- **Virtual desktops:** desktop number in the notification area, the desktop's name when you switch, and Ctrl+Win+Alt+1…9 / 0 to jump between desktops.
+- **Network repair** on Troubleshoot: clear DNS cache, renew IP address, reset Winsock, reset TCP/IP.
+- **Built-in apps and Store repair** on Get apps: remove built-in apps you don't use, clear the Store cache, re-register the Store or all your apps.
+- **Windows page:** search indexing on/off; Filter Keys and Toggle Keys pop-ups off, no system beep, no notification centre, faster service shutdown, no error reports.
+- **Mode shortcuts:** Ctrl+Alt+Shift+F1 Off, F2 Turbo, F3 Smart, F4 Silent (Settings › Behaviour).
+
 ## What's new in 0.10.2
 
 - **Scan & Fix shows its details.** Every finding has *Show details*: the settings, apps, leaking processes, drives or startup apps behind it. The Windows settings finding lists each setting with what it does and when it takes effect, and only the ones you tick are applied.

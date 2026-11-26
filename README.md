@@ -25,15 +25,16 @@ Get the latest release from the **Releases** page:
 | **Security** | A plain-language check-up of protection, device security, network exposure and an attacker's-eye view (unquoted service paths, writable PATH folders, auto sign-in, AutoRun…); fixes show exactly what they change and can be undone |
 | **Speed** | Modes, free up RAM, automatic fixes, power settings |
 | **Clean** | Junk files, Windows Update leftovers (download and delivery caches, old components, orphaned installer packages: moved, never deleted), optimize a drive |
-| **Windows** | 35+ documented Windows settings in groups (speed, privacy, Windows behaviour, Windows Update), optional Windows features (Linux subsystem, Sandbox, Hyper-V, .NET 3.5, OpenSSH server…), DNS provider with restore |
+| **Windows** | 40+ documented Windows settings in groups (speed, privacy, Windows behaviour, Windows Update), optional Windows features (Linux subsystem, Sandbox, Hyper-V, .NET 3.5, OpenSSH server…), search indexing on/off, DNS provider with restore |
+| **Undocumented** | Opt-in, behind a warning: about 50 hidden Windows settings, each labelled with what it really does (works, niche, placebo, no effect, risky, security risk); classic right-click menu, startup delay, timer and boot settings, virtual-desktop number, name overlay and hotkeys… Every change asks first and can be undone |
 | **Startup** | Boot time and trend, recommendations, startup apps with their impact |
 | **Apps** | Make a running app faster, slower or more efficient; rules for every time it starts |
-| **Get apps** | Install, update and remove 119 popular apps in one go through Microsoft's Windows Package Manager |
-| **Troubleshoot** | Everyday questions with a plain answer and a fix; Repair Windows, reset Windows Update, restore point, classic control panels |
+| **Get apps** | Install, update and remove 119 popular apps in one go through Microsoft's Windows Package Manager; remove built-in Windows apps; repair Microsoft Store |
+| **Troubleshoot** | Everyday questions with a plain answer and a fix; Repair Windows, reset Windows Update, restore point, network repair (DNS cache, IP address, Winsock, TCP/IP), classic control panels |
 | **History** | Everything that changed (undo one or everything) and everything PerfTuner did on its own |
 | **Settings, Help, About** | 27 colour themes, notifications, tray, the optional engine service; every topic explained |
 
-How it stays safe: documented Windows interfaces only (no drivers, no undocumented tricks), fixed and allow-listed changes (no free-form commands), every change journaled and undoable, protected Windows and program folders locked in the Space explorer, administrator-only storage for anything that's applied with administrator rights. Apart from its own engine and Windows' own panels, the only program PerfTuner starts with arguments it builds is Microsoft's `winget.exe` for the Get apps page, from its protected package folder, with fixed arguments. Details: [SECURITY.md](docs/SECURITY.md) and [SAFETY_POLICY.md](docs/SAFETY_POLICY.md).
+How it stays safe: documented Windows interfaces only (no drivers), except on the opt-in Undocumented page, which says what each hidden setting really does; fixed and allow-listed changes (no free-form commands), every change journaled and undoable, protected Windows and program folders locked in the Space explorer, administrator-only storage for undo records of anything applied machine-wide. Apart from its own engine and Windows' own panels, PerfTuner starts only Microsoft's `winget.exe` (from its protected package folder) and Windows' `bcdedit`, `netsh` and `WSReset` (from System32), always with fixed arguments. Details: [SECURITY.md](docs/SECURITY.md) and [SAFETY_POLICY.md](docs/SAFETY_POLICY.md).
 
 | Measured on Windows 11 (20 threads) | |
 |---|---|
